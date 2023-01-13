@@ -1,14 +1,17 @@
-extern crate rpassword;
-extern crate libloading;
 extern crate log4rs;
+extern crate rpassword;
 
 use unescape::unescape;
 
+use aries_askar::any::AnyStore;
+use indy_vdr::pool::LocalPool;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 
-use linefeed::{Reader, ReadResult};
+use linefeed::{ReadResult, Reader};
 
 #[derive(Debug)]
 pub struct ParamMetadata {
@@ -16,15 +19,17 @@ pub struct ParamMetadata {
     is_optional: bool,
     is_deferred: bool,
     help: &'static str,
-    dynamic_completion_type: Option<DynamicCompletionType>
+    dynamic_completion_type: Option<DynamicCompletionType>,
 }
 
 impl ParamMetadata {
-    pub fn new(name: &'static str,
-               is_optional: bool,
-               is_deferred: bool,
-               help: &'static str,
-               dynamic_completion_type: Option<DynamicCompletionType>) -> ParamMetadata {
+    pub fn new(
+        name: &'static str,
+        is_optional: bool,
+        is_deferred: bool,
+        help: &'static str,
+        dynamic_completion_type: Option<DynamicCompletionType>,
+    ) -> ParamMetadata {
         ParamMetadata {
             name,
             is_optional,
@@ -60,7 +65,7 @@ pub struct CommandMetadata {
     main_param: Option<ParamMetadata>,
     params: Vec<ParamMetadata>,
     examples: Vec<&'static str>,
-    dynamic_completion_type: Option<DynamicCompletionType>
+    dynamic_completion_type: Option<DynamicCompletionType>,
 }
 
 impl CommandMetadata {
@@ -71,7 +76,7 @@ impl CommandMetadata {
             main_param: None,
             params: Vec::new(),
             examples: Vec::new(),
-            dynamic_completion_type: None
+            dynamic_completion_type: None,
         }
     }
 
@@ -87,9 +92,13 @@ impl CommandMetadata {
         self.main_param.as_ref()
     }
 
-    pub fn params(&self) -> &[ParamMetadata] { self.params.as_slice() }
+    pub fn params(&self) -> &[ParamMetadata] {
+        self.params.as_slice()
+    }
 
-    pub fn examples(&self) -> &[&'static str] { self.examples.as_slice() }
+    pub fn examples(&self) -> &[&'static str] {
+        self.examples.as_slice()
+    }
 }
 
 pub struct CommandMetadataBuilder {
@@ -98,70 +107,109 @@ pub struct CommandMetadataBuilder {
     main_param: Option<ParamMetadata>,
     params: Vec<ParamMetadata>,
     examples: Vec<&'static str>,
-    dynamic_completion_type: Option<DynamicCompletionType>
+    dynamic_completion_type: Option<DynamicCompletionType>,
 }
 
 impl CommandMetadataBuilder {
-    pub fn add_main_param(mut self,
-                          name: &'static str,
-                          help: &'static str) -> CommandMetadataBuilder {
+    pub fn add_main_param(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+    ) -> CommandMetadataBuilder {
         self.main_param = Some(ParamMetadata::new(name, false, false, help, None));
         self
     }
-    pub fn add_main_param_with_dynamic_completion(mut self,
-                                                  name: &'static str,
-                                                  help: &'static str,
-                                                  completion_type: DynamicCompletionType) -> CommandMetadataBuilder {
-        self.main_param = Some(ParamMetadata::new(name, false, false, help, Some(completion_type)));
+    pub fn add_main_param_with_dynamic_completion(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+        completion_type: DynamicCompletionType,
+    ) -> CommandMetadataBuilder {
+        self.main_param = Some(ParamMetadata::new(
+            name,
+            false,
+            false,
+            help,
+            Some(completion_type),
+        ));
         self
     }
 
-    pub fn add_required_param(mut self,
-                              name: &'static str,
-                              help: &'static str) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, false, false, help, None));
+    pub fn add_required_param(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+    ) -> CommandMetadataBuilder {
+        self.params
+            .push(ParamMetadata::new(name, false, false, help, None));
         self
     }
 
-    pub fn add_required_param_with_dynamic_completion(mut self,
-                                                      name: &'static str,
-                                                      help: &'static str,
-                                                      dynamic_completion_type: DynamicCompletionType) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, false, false, help, Some(dynamic_completion_type)));
+    #[allow(unused)]
+    pub fn add_required_param_with_dynamic_completion(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+        dynamic_completion_type: DynamicCompletionType,
+    ) -> CommandMetadataBuilder {
+        self.params.push(ParamMetadata::new(
+            name,
+            false,
+            false,
+            help,
+            Some(dynamic_completion_type),
+        ));
         self
     }
 
-    pub fn add_optional_param(mut self,
-                              name: &'static str,
-                              help: &'static str) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, true, false, help, None));
+    pub fn add_optional_param(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+    ) -> CommandMetadataBuilder {
+        self.params
+            .push(ParamMetadata::new(name, true, false, help, None));
         self
     }
 
-    pub fn add_optional_param_with_dynamic_completion(mut self,
-                                                      name: &'static str,
-                                                      help: &'static str,
-                                                      dynamic_completion_type: DynamicCompletionType) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, true, false, help, Some(dynamic_completion_type)));
+    #[allow(unused)]
+    pub fn add_optional_param_with_dynamic_completion(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+        dynamic_completion_type: DynamicCompletionType,
+    ) -> CommandMetadataBuilder {
+        self.params.push(ParamMetadata::new(
+            name,
+            true,
+            false,
+            help,
+            Some(dynamic_completion_type),
+        ));
         self
     }
 
-    pub fn add_required_deferred_param(mut self,
-                                       name: &'static str,
-                                       help: &'static str) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, false, true, help, None));
+    pub fn add_required_deferred_param(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+    ) -> CommandMetadataBuilder {
+        self.params
+            .push(ParamMetadata::new(name, false, true, help, None));
         self
     }
 
-    pub fn add_optional_deferred_param(mut self,
-                                       name: &'static str,
-                                       help: &'static str) -> CommandMetadataBuilder {
-        self.params.push(ParamMetadata::new(name, true, true, help, None));
+    pub fn add_optional_deferred_param(
+        mut self,
+        name: &'static str,
+        help: &'static str,
+    ) -> CommandMetadataBuilder {
+        self.params
+            .push(ParamMetadata::new(name, true, true, help, None));
         self
     }
 
-    pub fn add_example(mut self,
-                       example: &'static str) -> CommandMetadataBuilder {
+    pub fn add_example(mut self, example: &'static str) -> CommandMetadataBuilder {
         self.examples.push(example);
         self
     }
@@ -178,17 +226,35 @@ impl CommandMetadataBuilder {
     }
 }
 
-#[derive(Debug)]
 pub struct CommandContext {
     main_prompt: RefCell<String>,
     sub_prompts: RefCell<BTreeMap<usize, String>>,
     is_exit: RefCell<bool>,
+    pool: RefCell<Option<Rc<LocalPool>>>,
+    store: RefCell<Option<Rc<AnyStore>>>,
     int_values: RefCell<HashMap<&'static str, i32>>,
     uint_values: RefCell<HashMap<&'static str, u64>>,
     string_values: RefCell<HashMap<&'static str, String>>,
-    plugins: RefCell<HashMap<String, libloading::Library>>,
     taa_acceptance_mechanism: RefCell<String>,
     is_batch_mode: RefCell<bool>,
+}
+
+impl Debug for CommandContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            &json!({
+                "main_prompt": self.main_prompt,
+                "sub_prompts": self.sub_prompts,
+                "is_exit": self.is_exit,
+                "int_values": self.int_values,
+                "uint_values": self.uint_values,
+                "string_values": self.string_values,
+                "taa_acceptance_mechanism": self.taa_acceptance_mechanism,
+                "is_batch_mode": self.is_batch_mode,
+            })
+            .to_string(),
+        )
+    }
 }
 
 impl CommandContext {
@@ -197,10 +263,11 @@ impl CommandContext {
             main_prompt: RefCell::new("indy".to_owned()),
             sub_prompts: RefCell::new(BTreeMap::new()),
             is_exit: RefCell::new(false),
+            pool: RefCell::new(None),
+            store: RefCell::new(None),
             int_values: RefCell::new(HashMap::new()),
             uint_values: RefCell::new(HashMap::new()),
             string_values: RefCell::new(HashMap::new()),
-            plugins: RefCell::new(HashMap::new()),
             taa_acceptance_mechanism: RefCell::new(String::new()),
             is_batch_mode: RefCell::new(false),
         }
@@ -239,16 +306,20 @@ impl CommandContext {
         *self.is_exit.borrow()
     }
 
-    pub fn set_int_value(&self, key: &'static str, value: Option<i32>) {
-        if let Some(value) = value {
-            self.int_values.borrow_mut().insert(key, value);
-        } else {
-            self.int_values.borrow_mut().remove(key);
-        }
+    pub fn set_store_value(&self, value: Option<AnyStore>) {
+        self.store.replace(value.map(|value| Rc::new(value)));
     }
 
-    pub fn get_int_value(&self, key: &'static str) -> Option<i32> {
-        self.int_values.borrow().get(key).map(i32::to_owned)
+    pub fn get_store_value(&self) -> Option<Rc<AnyStore>> {
+        self.store.borrow().clone()
+    }
+
+    pub fn set_pool_value(&self, value: Option<LocalPool>) {
+        self.pool.replace(value.map(|value| Rc::new(value)));
+    }
+
+    pub fn get_pool_value(&self) -> Option<Rc<LocalPool>> {
+        self.pool.borrow().clone()
     }
 
     pub fn set_uint_value(&self, key: &'static str, value: Option<u64>) {
@@ -273,11 +344,6 @@ impl CommandContext {
 
     pub fn get_string_value(&self, key: &'static str) -> Option<String> {
         self.string_values.borrow().get(key).map(String::to_owned)
-    }
-
-    pub fn add_plugin(&self, plugin_name: &str, plugin: libloading::Library) {
-        //TODO check already exists. Also check libindy
-        self.plugins.borrow_mut().insert(plugin_name.to_string(), plugin);
     }
 
     pub fn set_taa_acceptance_mechanism(&self, taa_acceptance_mechanism: &str) {
@@ -306,7 +372,6 @@ pub enum DynamicCompletionType {
     Wallet,
     Pool,
     Did,
-    PaymentAddress,
 }
 
 pub type CommandParams = HashMap<&'static str, String>;
@@ -321,9 +386,11 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new(metadata: CommandMetadata,
-               executor: CommandExecute,
-               cleaner: Option<CommandCleanup>) -> Command {
+    pub fn new(
+        metadata: CommandMetadata,
+        executor: CommandExecute,
+        cleaner: Option<CommandCleanup>,
+    ) -> Command {
         Command {
             metadata,
             executor,
@@ -354,10 +421,7 @@ pub struct CommandGroupMetadata {
 
 impl CommandGroupMetadata {
     pub fn new(name: &'static str, help: &'static str) -> CommandGroupMetadata {
-        CommandGroupMetadata {
-            name,
-            help
-        }
+        CommandGroupMetadata { name, help }
     }
 }
 
@@ -373,7 +437,6 @@ impl CommandGroupMetadata {
 pub struct CommandGroup {
     metadata: CommandGroupMetadata,
 }
-
 
 impl CommandGroup {
     pub fn new(metadata: CommandGroupMetadata) -> CommandGroup {
@@ -424,12 +487,15 @@ impl CommandExecutor {
         &self.ctx
     }
 
-    fn _get_dynamic_completions(&self, dynamic_completion_type: DynamicCompletionType, word: &str) -> Vec<(String, char)> {
+    fn _get_dynamic_completions(
+        &self,
+        dynamic_completion_type: DynamicCompletionType,
+        word: &str,
+    ) -> Vec<(String, char)> {
         let completions = match dynamic_completion_type {
             DynamicCompletionType::Wallet => crate::commands::wallet::wallet_names(),
-            DynamicCompletionType::Did => crate::commands::did::list_dids(self.ctx()),
+            DynamicCompletionType::Did => crate::commands::did::did_list(self.ctx()),
             DynamicCompletionType::Pool => crate::commands::pool::pool_list(),
-            DynamicCompletionType::PaymentAddress => crate::commands::payment_address::list_payment_addresses(self.ctx()),
         };
 
         completions
@@ -439,24 +505,39 @@ impl CommandExecutor {
             .collect()
     }
 
-    fn _get_main_param_dynamic_completions(&self, command: &Command, word: &str) -> Vec<(String, char)> {
-        match command.metadata().main_param.as_ref().and_then(|p| p.dynamic_completion_type.clone()) {
+    fn _get_main_param_dynamic_completions(
+        &self,
+        command: &Command,
+        word: &str,
+    ) -> Vec<(String, char)> {
+        match command
+            .metadata()
+            .main_param
+            .as_ref()
+            .and_then(|p| p.dynamic_completion_type.clone())
+        {
             Some(type_) => self._get_dynamic_completions(type_, word),
-            None => Vec::new()
+            None => Vec::new(),
         }
     }
 
-    fn _get_param_dynamic_completions(&self,
-                                      command_params: &[ParamMetadata],
-                                      line: &str,
-                                      word: &str,
-                                      cursor: usize) -> Option<Vec<(String, char)>> {
+    fn _get_param_dynamic_completions(
+        &self,
+        command_params: &[ParamMetadata],
+        line: &str,
+        word: &str,
+        cursor: usize,
+    ) -> Option<Vec<(String, char)>> {
         CommandExecutor::get_active_param(line, cursor, command_params)
             .and_then(|param| param.dynamic_completion_type.clone())
             .map(|type_| self._get_dynamic_completions(type_, word))
     }
 
-    fn get_active_param<'a>(line: &str, cursor: usize, params: &'a [ParamMetadata]) -> Option<&'a ParamMetadata> {
+    fn get_active_param<'a>(
+        line: &str,
+        cursor: usize,
+        params: &'a [ParamMetadata],
+    ) -> Option<&'a ParamMetadata> {
         let line = &line[..cursor];
         let last_space_index = line.rfind(' ').unwrap_or(0);
         let line = &line[last_space_index..];
@@ -465,24 +546,36 @@ impl CommandExecutor {
             .iter()
             .fold((0, None), |(max_index, last_param), param| {
                 if let Some(index_) = line.find(&format!("{}=", param.name)) {
-                    if index_ >= max_index /*&& index_ > last_space_index*/ {
+                    if index_ >= max_index
+                    /*&& index_ > last_space_index*/
+                    {
                         return (index_, Some(param));
                     }
                     (max_index, last_param)
-                } else { (max_index, last_param) }
-            }).1
+                } else {
+                    (max_index, last_param)
+                }
+            })
+            .1
     }
 
-    fn command_params(&self, command: &Command, params: &[&str], line: &str, word: &str, cursor: usize) -> Vec<(String, char)> {
+    fn command_params(
+        &self,
+        command: &Command,
+        params: &[&str],
+        line: &str,
+        word: &str,
+        cursor: usize,
+    ) -> Vec<(String, char)> {
         let mut completes: Vec<(String, char)> = Vec::new();
 
-        if command.metadata().main_param.is_some() && (params.is_empty() && word.is_empty() || params.len() == 1 && !word.is_empty()) {
+        if command.metadata().main_param.is_some()
+            && (params.is_empty() && word.is_empty() || params.len() == 1 && !word.is_empty())
+        {
             return self._get_main_param_dynamic_completions(command, word);
         }
 
-        let command_params = command
-            .metadata()
-            .params();
+        let command_params = command.metadata().params();
 
         match self._get_param_dynamic_completions(command_params, line, word, cursor) {
             Some(completions_) => {
@@ -494,8 +587,15 @@ impl CommandExecutor {
 
         let param_names: Vec<(String, char)> = command_params
             .iter()
-            .filter(|param_meta| !params.contains(&param_meta.name) && param_meta.name.starts_with(word))
-            .map(|param_meta| ((*param_meta.name).to_owned(), CommandExecutor::param_complete_symbol(param_meta)))
+            .filter(|param_meta| {
+                !params.contains(&param_meta.name) && param_meta.name.starts_with(word)
+            })
+            .map(|param_meta| {
+                (
+                    (*param_meta.name).to_owned(),
+                    CommandExecutor::param_complete_symbol(param_meta),
+                )
+            })
             .collect();
 
         completes.extend(param_names);
@@ -504,7 +604,11 @@ impl CommandExecutor {
     }
 
     fn param_complete_symbol(param: &ParamMetadata) -> char {
-        if !param.is_deferred() { '=' } else { ' ' }
+        if !param.is_deferred() {
+            '='
+        } else {
+            ' '
+        }
     }
 
     fn command_names(commands: &HashMap<&'static str, Command>, word: &str) -> Vec<(String, char)> {
@@ -515,7 +619,10 @@ impl CommandExecutor {
             .collect::<Vec<(String, char)>>()
     }
 
-    fn group_names(grouped_commands: &HashMap<&'static str, (CommandGroup, HashMap<&'static str, Command>)>, word: &str) -> Vec<(String, char)> {
+    fn group_names(
+        grouped_commands: &HashMap<&'static str, (CommandGroup, HashMap<&'static str, Command>)>,
+        word: &str,
+    ) -> Vec<(String, char)> {
         grouped_commands
             .iter()
             .filter(|name_meta| name_meta.0.starts_with(word))
@@ -523,8 +630,11 @@ impl CommandExecutor {
             .collect::<Vec<(String, char)>>()
     }
 
-    fn is_subcommand(grouped_commands: &HashMap<&'static str, (CommandGroup, HashMap<&'static str, Command>)>,
-                     command: &str, sub_command: &str) -> bool {
+    fn is_subcommand(
+        grouped_commands: &HashMap<&'static str, (CommandGroup, HashMap<&'static str, Command>)>,
+        command: &str,
+        sub_command: &str,
+    ) -> bool {
         let (_, ref commands) = grouped_commands[command];
         commands.contains_key(sub_command)
     }
@@ -572,11 +682,19 @@ impl CommandExecutor {
                 }
 
                 if self.commands.contains_key(command) {
-                    completes.extend(self.command_params(&self.commands[command], &[sub_command], line, word, cursor));
+                    completes.extend(self.command_params(
+                        &self.commands[command],
+                        &[sub_command],
+                        line,
+                        word,
+                        cursor,
+                    ));
                     return completes;
                 }
 
-                if self.grouped_commands.contains_key(command) && CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command) {
+                if self.grouped_commands.contains_key(command)
+                    && CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command)
+                {
                     let (_, ref commands) = self.grouped_commands[command];
                     let sub_command: &Command = &commands[sub_command];
 
@@ -593,7 +711,9 @@ impl CommandExecutor {
                     return completes;
                 }
 
-                if self.grouped_commands.contains_key(command) && !CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command) {
+                if self.grouped_commands.contains_key(command)
+                    && !CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command)
+                {
                     let (_, ref commands) = self.grouped_commands[command];
                     completes.extend(CommandExecutor::command_names(&commands, word));
                     return completes;
@@ -601,7 +721,13 @@ impl CommandExecutor {
             }
             (Some(command), None, Some(params)) => {
                 if self.commands.contains_key(command) {
-                    completes.extend(self.command_params(&self.commands[command], &params, line, word, cursor));
+                    completes.extend(self.command_params(
+                        &self.commands[command],
+                        &params,
+                        line,
+                        word,
+                        cursor,
+                    ));
                     return completes;
                 }
                 return completes;
@@ -616,16 +742,30 @@ impl CommandExecutor {
                     return completes;
                 }
 
-                if self.grouped_commands.contains_key(command) && CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command) {
+                if self.grouped_commands.contains_key(command)
+                    && CommandExecutor::is_subcommand(&self.grouped_commands, command, sub_command)
+                {
                     let (_, ref commands) = self.grouped_commands[command];
                     let sub_command = commands.get(sub_command).unwrap();
-                    completes.extend(self.command_params(&sub_command, &params, line, word, cursor));
+                    completes.extend(self.command_params(
+                        &sub_command,
+                        &params,
+                        line,
+                        word,
+                        cursor,
+                    ));
                     return completes;
                 }
 
                 if self.commands.contains_key(command) {
                     params.insert(0, sub_command);
-                    completes.extend(self.command_params(&self.commands[command], &params, line, word, cursor));
+                    completes.extend(self.command_params(
+                        &self.commands[command],
+                        &params,
+                        line,
+                        word,
+                        cursor,
+                    ));
                     return completes;
                 }
 
@@ -641,7 +781,12 @@ impl CommandExecutor {
         completes
     }
 
-    fn _execute_group_command(&self, group: &CommandGroup, commands: &HashMap<&'static str, Command>, line: &str) -> Result<(), ()> {
+    fn _execute_group_command(
+        &self,
+        group: &CommandGroup,
+        commands: &HashMap<&'static str, Command>,
+        line: &str,
+    ) -> Result<(), ()> {
         let (cmd, params) = CommandExecutor::_split_first_word(line);
 
         if cmd == "help" {
@@ -654,11 +799,20 @@ impl CommandExecutor {
         }
 
         println_err!("Unknown command \"{} {}\"", group.metadata().name(), cmd);
-        println!("Type \"{} help\" to display the help for \"{}\" group", group.metadata().name(), group.metadata().name());
+        println!(
+            "Type \"{} help\" to display the help for \"{}\" group",
+            group.metadata().name(),
+            group.metadata().name()
+        );
         Err(())
     }
 
-    fn _execute_command(&self, group: Option<&CommandGroup>, command: &Command, params: &str) -> Result<(), ()> {
+    fn _execute_command(
+        &self,
+        group: Option<&CommandGroup>,
+        command: &Command,
+        params: &str,
+    ) -> Result<(), ()> {
         let (first_word, _) = CommandExecutor::_split_first_word(params);
 
         if first_word == "help" {
@@ -671,13 +825,19 @@ impl CommandExecutor {
             Err(ref err) => {
                 println_err!("{}", err);
                 if group.is_some() {
-                    println!("Type \"{} {} help\" to display the help for \"{} {}\" command",
-                             group.unwrap().metadata().name(), command.metadata().name(),
-                             group.unwrap().metadata().name(), command.metadata().name());
+                    println!(
+                        "Type \"{} {} help\" to display the help for \"{} {}\" command",
+                        group.unwrap().metadata().name(),
+                        command.metadata().name(),
+                        group.unwrap().metadata().name(),
+                        command.metadata().name()
+                    );
                 } else {
-                    println!("Type \"{} help\" to display the help for \"{}\" command",
-                             command.metadata().name(),
-                             command.metadata().name());
+                    println!(
+                        "Type \"{} help\" to display the help for \"{}\" command",
+                        command.metadata().name(),
+                        command.metadata().name()
+                    );
                 }
                 Err(())
             }
@@ -698,14 +858,22 @@ impl CommandExecutor {
         println_acc!("Command groups are:");
 
         for &(ref group, _) in self.grouped_commands.values() {
-            println!("\t{} - {}", group.metadata().name(), group.metadata().help())
+            println!(
+                "\t{} - {}",
+                group.metadata().name(),
+                group.metadata().help()
+            )
         }
 
         println!();
         println_acc!("Top level commands are:");
 
         for command in self.commands.values() {
-            println!("\t{} - {}", command.metadata().name(), command.metadata().help())
+            println!(
+                "\t{} - {}",
+                command.metadata().name(),
+                command.metadata().help()
+            )
         }
 
         println!();
@@ -713,18 +881,29 @@ impl CommandExecutor {
 
     fn _print_group_help(&self, group: &CommandGroup, commands: &HashMap<&'static str, Command>) {
         println_acc!("Group:");
-        println!("\t{} - {}", group.metadata().name(), group.metadata().help());
+        println!(
+            "\t{} - {}",
+            group.metadata().name(),
+            group.metadata().help()
+        );
         println!();
         println_acc!("Usage:");
         println!("\t{} <command> [[<main-param-name>=]<main-param-value>] [<param_name-1>=<param_value-1>]...[<param_name-n>=<param_value-n>]", group.metadata().name());
         println!();
         println_acc!("Getting help:");
-        println!("\t{} <command> help - Display the help for the specific command", group.metadata().name());
+        println!(
+            "\t{} <command> help - Display the help for the specific command",
+            group.metadata().name()
+        );
         println!();
         println_acc!("Group commands are:");
 
         for command in commands.values() {
-            println!("\t{} - {}", command.metadata().name(), command.metadata().help())
+            println!(
+                "\t{} - {}",
+                command.metadata().name(),
+                command.metadata().help()
+            )
         }
 
         println!();
@@ -734,16 +913,29 @@ impl CommandExecutor {
         println_acc!("Command:");
 
         if let Some(group) = group {
-            println!("\t{} {} - {}", group.metadata().name(), command.metadata().name(), command.metadata().help());
+            println!(
+                "\t{} {} - {}",
+                group.metadata().name(),
+                command.metadata().name(),
+                command.metadata().help()
+            );
         } else {
-            println!("\t{} - {}", command.metadata().name(), command.metadata().help());
+            println!(
+                "\t{} - {}",
+                command.metadata().name(),
+                command.metadata().help()
+            );
         }
 
         println!();
         println_acc!("Usage:");
 
         if let Some(group) = group {
-            print!("\t{} {}", group.metadata().name(), command.metadata().name());
+            print!(
+                "\t{} {}",
+                group.metadata().name(),
+                command.metadata().name()
+            );
         } else {
             print!("\t{}", command.metadata().name());
         }
@@ -757,7 +949,7 @@ impl CommandExecutor {
                 (true, true) => print!(" [{}[=<{}-value>]]", param.name(), param.name()),
                 (true, false) => print!(" [{}=<{}-value>]", param.name(), param.name()),
                 (false, true) => print!(" {}[=<{}-value>]", param.name(), param.name()),
-                (false, false) => print!(" {}=<{}-value>", param.name(), param.name())
+                (false, false) => print!(" {}=<{}-value>", param.name(), param.name()),
             }
         }
 
@@ -808,13 +1000,19 @@ impl CommandExecutor {
             params = tail;
 
             if param_value.is_empty() {
-                return Err(format!("No main \"{}\" parameter present", param_metadata.name()));
+                return Err(format!(
+                    "No main \"{}\" parameter present",
+                    param_metadata.name()
+                ));
             }
 
             if let Some(param_value) = unescape(CommandExecutor::_trim_quotes(param_value)) {
                 res.insert(param_metadata.name(), param_value);
             } else {
-                return Err(format!("Invalid escape sequence for \"{}\" parameter present", param_metadata.name()));
+                return Err(format!(
+                    "Invalid escape sequence for \"{}\" parameter present",
+                    param_metadata.name()
+                ));
             }
         }
 
@@ -834,24 +1032,28 @@ impl CommandExecutor {
             let param_value = split.next();
 
             if res.contains_key(param_name) {
-                return Err(format!("\"{}\" parameter presented multiple times", param_name));
+                return Err(format!(
+                    "\"{}\" parameter presented multiple times",
+                    param_name
+                ));
             }
 
             match command.params().iter().find(|p| p.name() == param_name) {
-                Some(param_metadata) => {
-                    match param_value {
-                        Some(param_value) => {
-                            unescape(CommandExecutor::_trim_quotes(&param_value))
-                                .ok_or(format!("Invalid escape sequence for \"{}\" parameter present", param_name))
-                                .map(|param_value| res.insert(param_metadata.name(), param_value))?;
-                        }
-                        _ if param_metadata.is_deferred() => {
-                            deferred_params.push(param_metadata.name());
-                        }
-                        _ => return Err(format!("No value for \"{}\" parameter present", param_name))
+                Some(param_metadata) => match param_value {
+                    Some(param_value) => {
+                        unescape(CommandExecutor::_trim_quotes(&param_value))
+                            .ok_or(format!(
+                                "Invalid escape sequence for \"{}\" parameter present",
+                                param_name
+                            ))
+                            .map(|param_value| res.insert(param_metadata.name(), param_value))?;
                     }
-                }
-                None => return Err(format!("Unknown \"{}\" parameter present", param_name))
+                    _ if param_metadata.is_deferred() => {
+                        deferred_params.push(param_metadata.name());
+                    }
+                    _ => return Err(format!("No value for \"{}\" parameter present", param_name)),
+                },
+                None => return Err(format!("Unknown \"{}\" parameter present", param_name)),
             }
         }
 
@@ -916,7 +1118,15 @@ impl CommandExecutor {
             }
         }
 
-        (first_word, second_word, if params.is_empty() { None } else { Some(params) })
+        (
+            first_word,
+            second_word,
+            if params.is_empty() {
+                None
+            } else {
+                Some(params)
+            },
+        )
     }
 
     fn _trim_quotes(s: &str) -> &str {
@@ -982,12 +1192,16 @@ pub struct CommandExecutorGroupBuilder {
 
 impl CommandExecutorGroupBuilder {
     pub fn add_command(mut self, command: Command) -> CommandExecutorGroupBuilder {
-        self.group_commands.insert(command.metadata().name(), command);
+        self.group_commands
+            .insert(command.metadata().name(), command);
         self
     }
 
     pub fn finalize_group(mut self) -> CommandExecutorBuilder {
-        self.grouped_commands.insert(self.group.metadata().name(), (self.group, self.group_commands));
+        self.grouped_commands.insert(
+            self.group.metadata().name(),
+            (self.group, self.group_commands),
+        );
         CommandExecutorBuilder {
             commands: self.commands,
             grouped_commands: self.grouped_commands,
@@ -1014,7 +1228,7 @@ pub fn wait_for_user_reply(ctx: &CommandContext) -> bool {
         } else if line == "n" || line == "no" {
             return false;
         } else {
-            continue
+            continue;
         }
     }
     false
@@ -1033,10 +1247,10 @@ mod tests {
         use super::*;
 
         command!(CommandMetadata::build("test_command", "Test command help")
-                    .add_main_param("main_param", "Main param help")
-                    .add_required_param("param1", "Param1 help")
-                    .add_optional_param("param2", "Param2 help")
-                    .finalize());
+            .add_main_param("main_param", "Main param help")
+            .add_required_param("param1", "Param1 help")
+            .add_optional_param("param2", "Param2 help")
+            .finalize());
 
         fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
             println!("Test command params: ctx {:?} params {:?}", ctx, params);

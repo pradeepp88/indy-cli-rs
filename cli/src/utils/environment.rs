@@ -9,7 +9,11 @@ impl EnvironmentUtils {
     pub fn indy_home_path() -> PathBuf {
         // TODO: FIXME: Provide better handling for the unknown home path case!!!
         let mut path = dirs::home_dir().unwrap_or(PathBuf::from("/home/indy"));
-        path.push(if cfg!(target_os = "ios") { "Documents/.indy_client" } else { ".indy_client" });
+        path.push(if cfg!(target_os = "ios") {
+            "Documents/.indy_client"
+        } else {
+            ".indy_client"
+        });
         path
     }
 
@@ -25,6 +29,19 @@ impl EnvironmentUtils {
         path
     }
 
+    pub fn wallets_path() -> PathBuf {
+        let mut path = EnvironmentUtils::indy_home_path();
+        path.push("wallets");
+        path
+    }
+
+    pub fn wallet_config_path(id: &str) -> PathBuf {
+        let mut path = Self::wallets_path();
+        path.push(id);
+        path.set_extension("json");
+        path
+    }
+
     pub fn pool_home_path() -> PathBuf {
         let mut path = EnvironmentUtils::indy_home_path();
         path.push("pool");
@@ -34,6 +51,22 @@ impl EnvironmentUtils {
     pub fn pool_path(pool_name: &str) -> PathBuf {
         let mut path = EnvironmentUtils::pool_home_path();
         path.push(pool_name);
+        path
+    }
+
+    pub fn pool_transactions_path(pool_name: &str) -> PathBuf {
+        let mut path = EnvironmentUtils::pool_home_path();
+        path.push(pool_name);
+        path.push(pool_name);
+        path.set_extension("txn");
+        path
+    }
+
+    pub fn pool_config_path(id: &str) -> PathBuf {
+        let mut path = Self::pool_home_path();
+        path.push(id);
+        path.push(id);
+        path.set_extension("json");
         path
     }
 

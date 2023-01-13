@@ -1,33 +1,20 @@
-use crate::command_executor::{Command, CommandContext, CommandMetadata, CommandParams, CommandGroup, CommandGroupMetadata, DynamicCompletionType};
+use crate::command_executor::{
+    Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
+    DynamicCompletionType,
+};
 use crate::commands::*;
-use crate::utils::table::print_list_table;
-use indy::ErrorCode;
-use crate::libindy::wallet::Wallet;
-
-use serde_json;
-use serde_json::Value as JSONValue;
-use serde_json::Map as JSONMap;
-
-use std::fs;
-use std::fs::File;
+use crate::tools::wallet::{Credentials, Wallet};
 use crate::utils::environment::EnvironmentUtils;
-use std::io::{Read, Write};
-use std::path::PathBuf;
-
-fn build_credentials(key: &str, key_derivation_method: &str, storage_credentials: Option<JSONValue>) -> String {
-    let mut json = JSONMap::new();
-
-    json.insert("key".to_string(), serde_json::Value::String(key.to_string()));
-    json.insert("key_derivation_method".to_string(), serde_json::Value::String(key_derivation_method.to_string()));
-    update_json_map_opt_key!(json, "storage_credentials", storage_credentials);
-
-    JSONValue::from(json).to_string()
-}
+use crate::utils::table::print_list_table;
+use crate::utils::wallet_config::{Config, WalletConfig};
 
 pub mod group {
     use super::*;
 
-    command_group!(CommandGroupMetadata::new("wallet", "Wallet management commands"));
+    command_group!(CommandGroupMetadata::new(
+        "wallet",
+        "Wallet management commands"
+    ));
 }
 
 pub mod create_command {
@@ -55,59 +42,45 @@ pub mod create_command {
 
         let id = get_str_param("name", params).map_err(error_err!())?;
         let key = get_str_param("key", params).map_err(error_err!())?;
-        let key_derivation_method = get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
-        let storage_type = get_opt_str_param("storage_type", params).map_err(error_err!())?.unwrap_or("default");
-        let storage_config = get_opt_object_param("storage_config", params).map_err(error_err!())?;
-        let storage_credentials = get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
+        let key_derivation_method = get_opt_str_param("key_derivation_method", params)?;
+        let storage_type = get_opt_str_param("storage_type", params)
+            .map_err(error_err!())?
+            .unwrap_or("default");
+        let storage_config =
+            get_opt_object_param("storage_config", params).map_err(error_err!())?;
+        let storage_credentials =
+            get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
 
-        let config: String = json!({ "id": id, "storage_type": storage_type, "storage_config": storage_config }).to_string();
+        let config = Config {
+            id: id.to_string(),
+            storage_type: storage_type.to_string(),
+            storage_config,
+        };
+        let credentials = Credentials {
+            key: key.to_string(),
+            key_derivation_method: key_derivation_method.map(String::from),
+            rekey: None,
+            rekey_derivation_method: None,
+            storage_credentials,
+        };
 
-        let credentials = build_credentials(
-            key,
-            &map_key_derivation_method(key_derivation_method)?.to_string(),
-            storage_credentials);
-
-        if _wallet_config_path(id).exists() {
-            println_err!("Wallet \"{}\" is already attached to CLI", id);
+        if EnvironmentUtils::wallet_config_path(id).exists() {
+            println_err!("Wallet \"{}\" already attached to CLI", id);
             return Err(());
         }
 
-        trace!("Wallet::create_wallet try: config {}", config);
+        trace!("Wallet::create_wallet try: config {:?}", config);
 
-        let res = Wallet::create_wallet(config.as_str(),
-                                        credentials.as_str(),
-        );
+        Wallet::create(&config, &credentials)
+            .map_err(|err| println_err!("{}", err.message(Some(&id))))?;
 
-        trace!("Wallet::create_wallet return: {:?}", res);
+        WalletConfig::store(id, &config)
+            .map_err(|err| println_err!("Cannot store wallet \"{}\" config file: {:?}", id, err))?;
 
-        let res = match res {
-            Ok(()) => {
-                _store_wallet_config(id, &config)
-                    .map_err(|err| println_err!("Cannot store wallet \"{}\" config file: {:?}", id, err))?;
+        println_succ!("Wallet \"{}\" has been created", id);
 
-                println_succ!("Wallet \"{}\" has been created", id);
-                Ok(())
-            }
-            Err(err) => {
-                match err.error_code {
-                    ErrorCode::WalletAlreadyExistsError => {
-                        println_err!("Wallet \"{}\" already exists", id);
-                        Err(())
-                    },
-                    ErrorCode::CommonIOError => {
-                        println_err!("Invalid wallet name \"{}\"", id);
-                        Err(())
-                    },
-                    _ => {
-                        handle_indy_error(err, None, None, Some(&id));
-                        Err(())
-                    }
-                }
-            }
-        };
-
-        trace!("execute << {:?}", res);
-        res
+        trace!("execute << {:?}", ());
+        Ok(())
     }
 }
 
@@ -128,20 +101,28 @@ pub mod attach_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
         let id = get_str_param("name", params).map_err(error_err!())?;
-        let storage_type = get_opt_str_param("storage_type", params).map_err(error_err!())?.unwrap_or("default");
-        let storage_config = get_opt_object_param("storage_config", params).map_err(error_err!())?;
+        let storage_type = get_opt_str_param("storage_type", params)
+            .map_err(error_err!())?
+            .unwrap_or("default");
+        let storage_config =
+            get_opt_object_param("storage_config", params).map_err(error_err!())?;
 
-        if _wallet_config_path(id).exists() {
+        if EnvironmentUtils::wallet_config_path(id).exists() {
             println_err!("Wallet \"{}\" is already attached to CLI", id);
             return Err(());
         }
 
-        let config: String = json!({ "id": id, "storage_type": storage_type, "storage_config": storage_config }).to_string();
+        let config = Config {
+            id: id.to_string(),
+            storage_type: storage_type.to_string(),
+            storage_config,
+        };
 
-        _store_wallet_config(id, &config)
+        WalletConfig::store(id, &config)
             .map_err(|err| println_err!("Cannot store wallet \"{}\" config file: {:?}", id, err))?;
 
         println_succ!("Wallet \"{}\" has been attached", id);
+
         trace!("execute << ");
         Ok(())
     }
@@ -174,90 +155,45 @@ pub mod open_command {
         let id = get_str_param("name", params).map_err(error_err!())?;
         let key = get_str_param("key", params).map_err(error_err!())?;
         let rekey = get_opt_str_param("rekey", params).map_err(error_err!())?;
-        let key_derivation_method = get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
-        let rekey_derivation_method = get_opt_str_param("rekey_derivation_method", params).map_err(error_err!())?;
-        let storage_credentials = get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
+        let key_derivation_method =
+            get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
+        let rekey_derivation_method =
+            get_opt_str_param("rekey_derivation_method", params).map_err(error_err!())?;
+        let storage_credentials =
+            get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
 
-        let config = _read_wallet_config(id)
+        let config = WalletConfig::read(id)
             .map_err(|_| println_err!("Wallet \"{}\" isn't attached to CLI", id))?;
 
-        let credentials = {
-            let mut json = JSONMap::new();
-
-            json.insert("key".to_string(), serde_json::Value::String(key.to_string()));
-            json.insert("key_derivation_method".to_string(), serde_json::Value::String(map_key_derivation_method(key_derivation_method)?.to_string()));
-
-            update_json_map_opt_key!(json, "rekey", rekey);
-            json.insert("rekey_derivation_method".to_string(), serde_json::Value::String(map_key_derivation_method(rekey_derivation_method)?.to_string()));
-            update_json_map_opt_key!(json, "storage_credentials", storage_credentials);
-
-            JSONValue::from(json).to_string()
+        let credentials = Credentials {
+            key: key.to_string(),
+            key_derivation_method: key_derivation_method.map(String::from),
+            rekey: rekey.map(String::from),
+            rekey_derivation_method: rekey_derivation_method.map(String::from),
+            storage_credentials,
         };
 
-        let res = Ok(())
-            .and_then(|_| {
-                set_active_did(ctx, None);
-                if let Some((handle, id)) = get_opened_wallet(ctx) {
-                    match Wallet::close_wallet(handle) {
-                        Ok(()) => {
-                            println_succ!("Wallet \"{}\" has been closed", id);
-                            Ok(())
-                        },
-                        Err(err) => {
-                            handle_indy_error(err, None, None, Some(&id));
-                            Err(())
-                        }
-                    }
-                } else {
-                    Ok(())
-                }
-            })
-            .and_then(|_| {
-                match Wallet::open_wallet(config.as_str(), &credentials.as_str()) {
-                    Ok(handle) => {
-                        set_opened_wallet(ctx, Some((handle, id.to_owned())));
-                        println_succ!("Wallet \"{}\" has been opened", id);
-                        Ok(())
-                    }
-                    Err(err) => {
-                        set_opened_wallet(ctx, None);
-                        match err.error_code {
-                            ErrorCode::WalletAlreadyOpenedError => {
-                                println_err!("Wallet \"{}\" already opened", id);
-                                Err(())
-                            },
-                            ErrorCode::WalletAccessFailed => {
-                                println_err!("Cannot open wallet \"{}\". Invalid key has been provided", id);
-                                Err(())
-                            },
-                            ErrorCode::WalletNotFoundError => {
-                                println_err!("Wallet \"{}\" not found or unavailable", id);
-                                Err(())
-                            },
-                            _ => {
-                                handle_indy_error(err, None, None, Some(&id));
-                                Err(())
-                            },
-                        }
-                    }
-                }
-            });
+        reset_active_did(ctx);
 
-        trace!("execute << {:?}", res);
-        res
+        if let Some((store, id)) = get_opened_wallet(ctx) {
+            close_wallet(ctx, &store, &id)?;
+        }
+
+        let store = Wallet::open(&config, &credentials)
+            .map_err(|err| println_err!("{}", err.message(Some(&id))))?;
+
+        set_opened_wallet(ctx, Some((store, id.to_owned())));
+        println_succ!("Wallet \"{}\" has been opened", id);
+
+        trace!("execute << {:?}", ());
+        Ok(())
     }
 
     pub fn cleanup(ctx: &CommandContext) {
         trace!("cleanup >> ctx {:?}", ctx);
 
-        if let Some((handle, name)) = get_opened_wallet(ctx) {
-            match Wallet::close_wallet(handle) {
-                Ok(()) => {
-                    set_opened_wallet(ctx, Some((handle, name.clone())));
-                    println_succ!("Wallet \"{}\" has been closed", name)
-                }
-                Err(err) => handle_indy_error(err, None, None, None)
-            }
+        if let Some((store, id)) = get_opened_wallet(ctx) {
+            close_wallet(ctx, &store, &id).ok();
         }
 
         trace!("cleanup <<");
@@ -267,67 +203,44 @@ pub mod open_command {
 pub mod list_command {
     use super::*;
 
-    command!(CommandMetadata::build("list", "List attached wallets.")
-                .finalize()
-    );
+    command!(CommandMetadata::build("list", "List attached wallets.").finalize());
 
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let wallets: Vec<serde_json::Value> = _list_wallets();
+        let wallets = Wallet::list();
 
-        print_list_table(&wallets,
-                         &[("id", "Name"),
-                               ("storage_type", "Type")],
-                         "There are no wallets");
+        print_list_table(
+            &wallets,
+            &[("id", "Name"), ("storage_type", "Type")],
+            "There are no wallets",
+        );
 
         if let Some((_, cur_wallet)) = get_opened_wallet(ctx) {
             println_succ!("Current wallet \"{}\"", cur_wallet);
         }
 
-        let res = Ok(());
-
-        trace!("execute << {:?}", res);
-        res
+        trace!("execute << ");
+        Ok(())
     }
 }
 
 pub mod close_command {
     use super::*;
 
-    command!(CommandMetadata::build("close", "Close opened wallet.")
-                    .finalize());
+    command!(CommandMetadata::build("close", "Close opened wallet.").finalize());
 
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let res = Ok(())
-            .and_then(|_| {
-                if let Some(wallet) = get_opened_wallet(ctx) {
-                    Ok(wallet)
-                } else {
-                    println_err!("There is no opened wallet now");
-                    Err(())
-                }
-            })
-            .and_then(|wallet| {
-                let (handle, name) = wallet;
-                match Wallet::close_wallet(handle) {
-                    Ok(()) => {
-                        set_opened_wallet(ctx, None);
-                        set_active_did(ctx, None);
-                        println_succ!("Wallet \"{}\" has been closed", name);
-                        Ok(())
-                    }
-                    Err(err) => {
-                        handle_indy_error(err, None, None, None);
-                        Err(())
-                    }
-                }
-            });
+        if let Some((store, id)) = get_opened_wallet(ctx) {
+            close_wallet(ctx, &store, &id)?;
+        } else {
+            println_err!("There is no opened wallet now");
+        }
 
-        trace!("CloseCommand::execute << {:?}", res);
-        res
+        trace!("CloseCommand::execute <<");
+        Ok(())
     }
 }
 
@@ -352,55 +265,51 @@ pub mod delete_command {
 
         let id = get_str_param("name", params).map_err(error_err!())?;
         let key = get_str_param("key", params).map_err(error_err!())?;
-        let key_derivation_method = get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
-        let storage_credentials = get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
+        let key_derivation_method =
+            get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
+        let storage_credentials =
+            get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
 
-        let config = _read_wallet_config(id)
+        let config = WalletConfig::read(id)
             .map_err(|_| println_err!("Wallet \"{}\" isn't attached to CLI", id))?;
 
-        let credentials = build_credentials(
-            key,
-            &map_key_derivation_method(key_derivation_method)?.to_string(),
-            storage_credentials);
-
-        let res = match Wallet::delete_wallet(config.as_str(), credentials.as_str()) {
-            Ok(()) => {
-                _delete_wallet_config(id)
-                    .map_err(|err| println_err!("Cannot delete \"{}\" config file: {:?}", id, err))?;
-
-                println_succ!("Wallet \"{}\" has been deleted", id);
-                Ok(())
-            }
-            Err(err) => {
-                match err.error_code {
-                    ErrorCode::WalletNotFoundError => {
-                        println_err!("Wallet \"{}\" not found or unavailable", id);
-                        Err(())
-                    },
-                    ErrorCode::WalletAccessFailed => {
-                        println_err!("Cannot delete wallet \"{}\". Invalid key has been provided ", id);
-                        Err(())
-                    },
-                    _ => {
-                        handle_indy_error(err, None, None, Some(&id));
-                        Err(())
-                    }
-                }
-            }
+        let credentials = Credentials {
+            key: key.to_string(),
+            key_derivation_method: key_derivation_method.map(String::from),
+            rekey: None,
+            rekey_derivation_method: None,
+            storage_credentials,
         };
 
-        trace!("execute << {:?}", res);
-        res
+        if let Some((store, id)) = get_opened_wallet(ctx) {
+            close_wallet(ctx, &store, &id)?;
+        }
+
+        Wallet::delete(&config, &credentials)
+            .map_err(|err| println_err!("{}", err.message(Some(id))))?;
+
+        WalletConfig::delete(id)
+            .map_err(|err| println_err!("Cannot delete \"{}\" config file: {:?}", id, err))?;
+
+        println_succ!("Wallet \"{}\" has been deleted", id);
+
+        trace!("execute <<");
+        Ok(())
     }
 }
 
 pub mod detach_command {
     use super::*;
 
-    command!(CommandMetadata::build("detach", "Detach wallet from Indy CLI")
-                .add_main_param_with_dynamic_completion("name", "Identifier of the wallet", DynamicCompletionType::Wallet)
-                .add_example("wallet detach wallet1")
-                .finalize()
+    command!(
+        CommandMetadata::build("detach", "Detach wallet from Indy CLI")
+            .add_main_param_with_dynamic_completion(
+                "name",
+                "Identifier of the wallet",
+                DynamicCompletionType::Wallet
+            )
+            .add_example("wallet detach wallet1")
+            .finalize()
     );
 
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
@@ -408,7 +317,7 @@ pub mod detach_command {
 
         let id = get_str_param("name", params).map_err(error_err!())?;
 
-        if !_wallet_config_path(id).exists() {
+        if !EnvironmentUtils::wallet_config_path(id).exists() {
             println_err!("Wallet \"{}\" isn't attached to CLI", id);
             return Err(());
         }
@@ -420,10 +329,11 @@ pub mod detach_command {
             }
         }
 
-        _delete_wallet_config(id)
+        WalletConfig::delete(id)
             .map_err(|err| println_err!("Cannot delete \"{}\" config file: {:?}", id, err))?;
 
-        println_succ!("Wallet \"{}\" has been detached", id);
+        println_succ!("Wallet \"{}\" has been deleted", id);
+
         trace!("execute << ");
         Ok(())
     }
@@ -431,6 +341,7 @@ pub mod detach_command {
 
 pub mod export_command {
     use super::*;
+    use crate::tools::wallet::ExportConfig;
 
     command!(CommandMetadata::build("export", "Export opened wallet to the file")
                 .add_required_param("export_path", "Path to the export file")
@@ -447,38 +358,42 @@ pub mod export_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let (wallet_handle, wallet_name) = ensure_opened_wallet(&ctx)?;
+        let (store, wallet_name) = ensure_opened_wallet(&ctx)?;
 
         let export_path = get_str_param("export_path", params).map_err(error_err!())?;
         let export_key = get_str_param("export_key", params).map_err(error_err!())?;
-        let export_key_derivation_method = get_opt_str_param("export_key_derivation_method", params).map_err(error_err!())?;
-        let export_config: String = json!({ "path": export_path, "key": export_key, "key_derivation_method": map_key_derivation_method(export_key_derivation_method)? }).to_string();
+        let export_key_derivation_method =
+            get_opt_str_param("export_key_derivation_method", params).map_err(error_err!())?;
 
-        trace!("Wallet::export_wallet try: wallet_name {}, export_path {}", wallet_name, export_path);
-
-        let res = Wallet::export_wallet(wallet_handle,
-                                        export_config.as_str());
-
-        trace!("Wallet::export_wallet return: {:?}", res);
-
-        let res = match res {
-            Ok(()) => {
-                println_succ!("Wallet \"{}\" has been exported to the file \"{}\"", wallet_name, export_path);
-                Ok(())
-            },
-            Err(err) => {
-                handle_indy_error(err, None, None, Some(wallet_name.as_ref()));
-                Err(())
-            }
+        let export_config = ExportConfig {
+            path: export_path.to_string(),
+            key: export_key.to_string(),
+            key_derivation_method: export_key_derivation_method.map(String::from),
         };
 
-        trace!("execute << {:?}", res);
-        res
+        trace!(
+            "Wallet::export_wallet try: wallet_name {}, export_path {}",
+            wallet_name,
+            export_path
+        );
+
+        Wallet::export(&store, &export_config)
+            .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
+
+        println_succ!(
+            "Wallet \"{}\" has been exported to the file \"{}\"",
+            wallet_name,
+            export_path
+        );
+
+        trace!("execute <<");
+        Ok(())
     }
 }
 
 pub mod import_command {
     use super::*;
+    use crate::tools::wallet::ImportConfig;
 
     command!(CommandMetadata::build("import", "Create new wallet, attach to Indy CLI and then import content from the specified file")
                 .add_main_param_with_dynamic_completion("name", "The name of new wallet", DynamicCompletionType::Wallet)
@@ -503,137 +418,81 @@ pub mod import_command {
 
         let id = get_str_param("name", params).map_err(error_err!())?;
         let key = get_str_param("key", params).map_err(error_err!())?;
-        let key_derivation_method = get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
+        let key_derivation_method =
+            get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
         let export_path = get_str_param("export_path", params).map_err(error_err!())?;
         let export_key = get_str_param("export_key", params).map_err(error_err!())?;
-        let storage_type = get_opt_str_param("storage_type", params).map_err(error_err!())?;
-        let storage_config = get_opt_object_param("storage_config", params).map_err(error_err!())?;
-        let storage_credentials = get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
+        let storage_type = get_opt_str_param("storage_type", params)
+            .map_err(error_err!())?
+            .unwrap_or("default");
+        let storage_config =
+            get_opt_object_param("storage_config", params).map_err(error_err!())?;
+        let storage_credentials =
+            get_opt_object_param("storage_credentials", params).map_err(error_err!())?;
 
-        let config: String = json!({ "id": id, "storage_type": storage_type, "storage_config": storage_config }).to_string();
-        let import_config: String = json!({ "path": export_path, "key": export_key}).to_string();
+        let config = Config {
+            id: id.to_string(),
+            storage_type: storage_type.to_string(),
+            storage_config,
+        };
 
-        let credentials = build_credentials(
-            key,
-            &map_key_derivation_method(key_derivation_method)?.to_string(),
-            storage_credentials);
+        let import_config = ImportConfig {
+            path: export_path.to_string(),
+            key: export_key.to_string(),
+        };
 
-        if _wallet_config_path(id).exists() {
+        let credentials = Credentials {
+            key: key.to_string(),
+            key_derivation_method: key_derivation_method.map(String::from),
+            rekey: None,
+            rekey_derivation_method: None,
+            storage_credentials,
+        };
+
+        if EnvironmentUtils::wallet_config_path(id).exists() {
             println_err!("Wallet \"{}\" is already attached to CLI", id);
             return Err(());
         }
 
-        trace!("Wallet::import_wallet try: config {}, import_config {}", config, secret!(&import_config));
-
-        let res = Wallet::import_wallet(config.as_str(),
-                                        credentials.as_str(),
-                                        import_config.as_str(),
+        trace!(
+            "Wallet::import_wallet try: config {:?}, import_config {:?}",
+            config,
+            secret!(&import_config)
         );
 
-        trace!("Wallet::import_wallet return: {:?}", res);
+        Wallet::import(&config, &credentials, &import_config)
+            .map_err(|err| println_err!("{}", err.message(Some(id))))?;
 
-        let res = match res {
-            Ok(()) => {
-                _store_wallet_config(id, &config)
-                    .map_err(|err| println_err!("Cannot store \"{}\" config file: {:?}", id, err))?;
-                println_succ!("Wallet \"{}\" has been created", id);
-                Ok(())
-            }
-            Err(err) => {
-                handle_indy_error(err, None, None, Some(id));
-                Err(())
-            }
-        };
+        WalletConfig::store(id, &config)
+            .map_err(|err| println_err!("Cannot store \"{}\" config file: {:?}", id, err))?;
 
-        trace!("execute << {:?}", res);
-        res
+        println_succ!("Wallet \"{}\" has been created", id);
+
+        trace!("execute <<");
+        Ok(())
     }
 }
 
-fn _wallets_path() -> PathBuf {
-    let mut path = EnvironmentUtils::indy_home_path();
-    path.push("wallets");
-    path
-}
-
-fn _wallet_config_path(id: &str) -> PathBuf {
-    let mut path = _wallets_path();
-    path.push(id);
-    path.set_extension("json");
-    path
-}
-
-fn _init_wallets_dir(path: &PathBuf) -> Result<(), std::io::Error> {
-    fs::DirBuilder::new()
-        .recursive(true)
-        .create(path)
-}
-
-fn _store_wallet_config(id: &str, config: &str) -> Result<(), std::io::Error> {
-    _init_wallets_dir(&_wallets_path())?;
-
-    let path = _wallet_config_path(id);
-
-    let mut config_file = File::create(path)?;
-    config_file.write_all(config.as_bytes())?;
-    config_file.sync_all()?;
-
-    Ok(())
-}
-
-fn _read_wallet_config(id: &str) -> Result<String, std::io::Error> {
-    let path = _wallet_config_path(id);
-
-    let mut config_json = String::new();
-
-    let mut file = File::open(path)?;
-    file.read_to_string(&mut config_json)?;
-
-    Ok(config_json)
-}
-
-fn _delete_wallet_config(id: &str) -> Result<(), std::io::Error> {
-    let path = _wallet_config_path(id);
-    fs::remove_file(path)
-}
-
-fn _list_wallets() -> Vec<serde_json::Value> {
-    let mut configs: Vec<serde_json::Value> = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(_wallets_path()) {
-        for entry in entries {
-            let file = if let Ok(dir_entry) = entry { dir_entry } else { continue };
-
-            let mut config_json = String::new();
-
-            File::open(file.path()).ok()
-                .and_then(|mut f| f.read_to_string(&mut config_json).ok())
-                .and_then(|_| serde_json::from_str::<serde_json::Value>(config_json.as_str()).ok())
-                .map(|config| configs.push(config));
-        }
-    }
-
-    configs
+fn close_wallet(ctx: &CommandContext, store: &AnyStore, name: &str) -> Result<(), ()> {
+    Wallet::close(store)
+        .map(|_| {
+            set_opened_wallet(ctx, None);
+            reset_active_did(ctx);
+            println_succ!("Wallet \"{}\" has been closed", name);
+        })
+        .map_err(|err| println_err!("{}", err.message(Some(name))))
 }
 
 pub fn wallet_names() -> Vec<String> {
-    _list_wallets()
+    Wallet::list()
         .into_iter()
-        .map(|wallet| wallet["id"].as_str().map(String::from).unwrap_or(String::new()))
+        .map(|wallet| {
+            wallet["id"]
+                .as_str()
+                .map(String::from)
+                .unwrap_or(String::new())
+        })
         .collect()
-}
-
-fn map_key_derivation_method(key: Option<&str>) -> Result<&'static str, ()> {
-    // argon2m, argon2i, raw
-    match key {
-        None | Some("argon2m") => Ok("ARGON2I_MOD"),
-        Some("argon2i") => Ok("ARGON2I_INT"),
-        Some("raw") => Ok("RAW"),
-        val=> {
-            println_err!("Unsupported Wallet Key type has been specified \"{}\"", val.unwrap());
-            Err(())
-        },
-    }
 }
 
 #[cfg(test)]
@@ -739,8 +598,13 @@ pub mod tests {
             assert_eq!(1, wallets.len());
 
             assert_eq!(wallets[0]["id"].as_str().unwrap(), WALLET);
-            assert_eq!(wallets[0]["storage_config"].as_object().unwrap(),
-                       serde_json::from_str::<serde_json::Value>(config).unwrap().as_object().unwrap());
+            assert_eq!(
+                wallets[0]["storage_config"].as_object().unwrap(),
+                serde_json::from_str::<serde_json::Value>(config)
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+            );
             tear_down();
         }
 
@@ -857,8 +721,13 @@ pub mod tests {
             assert_eq!(1, wallets.len());
 
             assert_eq!(wallets[0]["id"].as_str().unwrap(), WALLET);
-            assert_eq!(wallets[0]["storage_config"].as_object().unwrap(),
-                       serde_json::from_str::<serde_json::Value>(config).unwrap().as_object().unwrap());
+            assert_eq!(
+                wallets[0]["storage_config"].as_object().unwrap(),
+                serde_json::from_str::<serde_json::Value>(config)
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+            );
 
             tear_down();
         }
@@ -879,7 +748,7 @@ pub mod tests {
                 params.insert("key_derivation_method", "raw".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            ensure_opened_wallet_handle(&ctx).unwrap();
+            ensure_opened_store(&ctx).unwrap();
             close_and_delete_wallet(&ctx);
 
             tear_down();
@@ -979,7 +848,7 @@ pub mod tests {
                 let params = CommandParams::new();
                 cmd.execute(&ctx, &params).unwrap();
             }
-            ensure_opened_wallet_handle(&ctx).unwrap_err();
+            ensure_opened_store(&ctx).unwrap_err();
             delete_wallet(&ctx);
             tear_down();
         }
@@ -1167,8 +1036,8 @@ pub mod tests {
     }
 
     mod import {
+        use super::did::tests::{new_did, use_did, DID_MY1, SEED_MY1};
         use super::*;
-        use super::did::tests::{new_did, use_did, SEED_MY1, DID_MY1};
 
         #[test]
         pub fn import_works() {
@@ -1316,8 +1185,13 @@ pub mod tests {
             assert_eq!(1, wallets.len());
 
             assert_eq!(wallets[0]["id"].as_str().unwrap(), WALLET);
-            assert_eq!(wallets[0]["storage_config"].as_object().unwrap(),
-                       serde_json::from_str::<serde_json::Value>(config).unwrap().as_object().unwrap());
+            assert_eq!(
+                wallets[0]["storage_config"].as_object().unwrap(),
+                serde_json::from_str::<serde_json::Value>(config)
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+            );
 
             tear_down();
         }
@@ -1446,7 +1320,7 @@ pub mod tests {
             cmd.execute(&ctx, &params).unwrap();
         }
 
-        ensure_opened_wallet_handle(&ctx).unwrap()
+        ensure_opened_store(&ctx).unwrap()
     }
 
     pub fn open_wallet(ctx: &CommandContext) -> WalletHandle {
@@ -1459,7 +1333,7 @@ pub mod tests {
             cmd.execute(&ctx, &params).unwrap();
         }
 
-        ensure_opened_wallet_handle(&ctx).unwrap()
+        ensure_opened_store(&ctx).unwrap()
     }
 
     pub fn close_and_delete_wallet(ctx: &CommandContext) {

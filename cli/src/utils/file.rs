@@ -1,8 +1,8 @@
-use std::io::{Read, Write};
-use std::io::BufReader;
+use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::BufRead;
-use std::path::{PathBuf, Path};
-use std::fs::{File, DirBuilder, OpenOptions};
+use std::io::BufReader;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 pub fn read_file<P: AsRef<Path>>(file: P) -> Result<String, String> {
     let mut file = File::open(file)
@@ -20,7 +20,9 @@ pub fn read_file<P: AsRef<Path>>(file: P) -> Result<String, String> {
     Ok(content)
 }
 
-pub fn read_lines_from_file<P: AsRef<Path>>(file: P) -> Result<impl Iterator<Item=Result<String, ::std::io::Error>>, String> {
+pub fn read_lines_from_file<P: AsRef<Path>>(
+    file: P,
+) -> Result<impl Iterator<Item = Result<String, ::std::io::Error>>, String> {
     let file = File::open(file)
         .map_err(error_err!())
         .map_err(|_| "Can't read the file".to_string())?;
@@ -29,7 +31,10 @@ pub fn read_lines_from_file<P: AsRef<Path>>(file: P) -> Result<impl Iterator<Ite
     Ok(lines)
 }
 
-pub fn write_file<P: AsRef<Path>>(file: P, content: &str) -> Result<(), String> where P: std::convert::AsRef<std::ffi::OsStr> {
+pub fn write_file<P: AsRef<Path>>(file: P, content: &str) -> Result<(), String>
+where
+    P: std::convert::AsRef<std::ffi::OsStr>,
+{
     let path = PathBuf::from(&file);
 
     if let Some(parent_path) = path.parent() {
