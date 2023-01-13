@@ -49,4 +49,32 @@ impl WalletConfig {
         let path = EnvironmentUtils::wallet_config_path(id);
         fs::remove_file(path)
     }
+
+    pub(crate) fn exists(id: &str) -> bool {
+        EnvironmentUtils::wallet_config_path(id).exists()
+    }
+
+    pub fn list() -> Vec<JsonValue> {
+        let mut configs: Vec<JsonValue> = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(EnvironmentUtils::wallets_path()) {
+            for entry in entries {
+                let file = if let Ok(dir_entry) = entry {
+                    dir_entry
+                } else {
+                    continue;
+                };
+
+                let mut config_json = String::new();
+
+                File::open(file.path())
+                    .ok()
+                    .and_then(|mut f| f.read_to_string(&mut config_json).ok())
+                    .and_then(|_| serde_json::from_str::<JsonValue>(config_json.as_str()).ok())
+                    .map(|config| configs.push(config));
+            }
+        }
+
+        configs
+    }
 }

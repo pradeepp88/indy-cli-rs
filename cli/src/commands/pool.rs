@@ -224,7 +224,7 @@ pub mod refresh_command {
 
         let (pool, pool_name) = ensure_connected_pool(&ctx)?;
 
-        Pool::refresh(&pool).map_err(|err| {
+        Pool::refresh(&pool_name, &pool).map_err(|err| {
             println_err!("{}", err.message(Some(&pool_name)));
             close_pool(ctx, &pool, &pool_name).ok();
         })?;

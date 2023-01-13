@@ -4,9 +4,10 @@ use crate::command_executor::{
 };
 use crate::commands::*;
 use crate::tools::wallet::{Credentials, Wallet};
-use crate::utils::environment::EnvironmentUtils;
-use crate::utils::table::print_list_table;
-use crate::utils::wallet_config::{Config, WalletConfig};
+use crate::utils::{
+    table::print_list_table,
+    wallet_config::{Config, WalletConfig},
+};
 
 pub mod group {
     use super::*;
@@ -64,11 +65,6 @@ pub mod create_command {
             storage_credentials,
         };
 
-        if EnvironmentUtils::wallet_config_path(id).exists() {
-            println_err!("Wallet \"{}\" already attached to CLI", id);
-            return Err(());
-        }
-
         trace!("Wallet::create_wallet try: config {:?}", config);
 
         Wallet::create(&config, &credentials)
@@ -107,7 +103,7 @@ pub mod attach_command {
         let storage_config =
             get_opt_object_param("storage_config", params).map_err(error_err!())?;
 
-        if EnvironmentUtils::wallet_config_path(id).exists() {
+        if WalletConfig::exists(id) {
             println_err!("Wallet \"{}\" is already attached to CLI", id);
             return Err(());
         }
@@ -317,7 +313,7 @@ pub mod detach_command {
 
         let id = get_str_param("name", params).map_err(error_err!())?;
 
-        if !EnvironmentUtils::wallet_config_path(id).exists() {
+        if !WalletConfig::exists(id) {
             println_err!("Wallet \"{}\" isn't attached to CLI", id);
             return Err(());
         }
@@ -449,7 +445,7 @@ pub mod import_command {
             storage_credentials,
         };
 
-        if EnvironmentUtils::wallet_config_path(id).exists() {
+        if WalletConfig::exists(id) {
             println_err!("Wallet \"{}\" is already attached to CLI", id);
             return Err(());
         }

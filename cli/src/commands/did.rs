@@ -3,15 +3,10 @@ use crate::command_executor::{
     DynamicCompletionType,
 };
 use crate::commands::*;
+use crate::commands::ledger::{handle_transaction_response, Response};
 use crate::utils::table::print_list_table;
-
 use crate::tools::did::Did;
 use crate::tools::ledger::Ledger;
-
-use serde_json::Value as JSONValue;
-use std::fs::File;
-
-use crate::commands::ledger::{handle_transaction_response, Response};
 
 pub mod group {
     use super::*;
@@ -70,7 +65,19 @@ pub mod new_command {
 
 pub mod import_command {
     use super::*;
-    use std::io::Read;
+    use crate::utils::file::read_file;
+
+    #[derive(Debug, Deserialize)]
+    struct DidImportConfig {
+        version: usize,
+        dids: Vec<DidImportInfo>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct DidImportInfo {
+        did: Option<String>,
+        seed: String,
+    }
 
     command!(CommandMetadata::build(
         "import",
@@ -94,32 +101,23 @@ pub mod import_command {
 
         let path = get_str_param("file", params).map_err(error_err!())?;
 
-        let mut buf = String::new();
+        let data = read_file(path)
+            .map_err(|_| println_err!("Unable to read DID import config from the provided file"))?;
 
-        File::open(path)
-            .and_then(|mut file| file.read_to_string(&mut buf))
-            .map_err(|err| println_err!("Error during reading file {}", err))?;
+        let config: DidImportConfig = serde_json::from_str(&data)
+            .map_err(|_| println_err!("Unable to read DID import config from the provided file"))?;
 
-        let json = serde_json::from_str::<JSONValue>(&buf)
-            .map_err(|err| println_err!("Can't parse JSON {:?}", err))?;
-
-        let is_correct_version = json["version"]
-            .as_i64()
-            .map(|ver| (ver == 1))
-            .unwrap_or(false);
-
-        if !is_correct_version {
-            println_err!("Invalid or missed version");
+        if config.version != 1 {
+            println_err!("Unsupported DID import config version");
             return Err(());
         }
 
-        let dids = json["dids"]
-            .as_array()
-            .map(Clone::clone)
-            .ok_or_else(|| println_err!("missed DIDs"))?;
-
-        for did in dids {
-            let (did, vk) = Did::new(&store, did["did"].as_str(), did["seed"].as_str(), None, None)
+        for did in config.dids {
+            let (did, vk) = Did::new(&store,
+                                     did.did.as_ref().map(String::as_str),
+                                     Some(&did.seed),
+                                     None,
+                                     None)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
 
             let vk = Did::abbreviate_verkey(&did, &vk)

@@ -1,10 +1,11 @@
 use crate::error::{CliError, CliResult};
 use crate::utils::environment::EnvironmentUtils;
-use crate::utils::wallet_config::Config;
+use crate::utils::wallet_config::{Config, WalletConfig};
 
-use aries_askar::{any::AnyStore, future::block_on, ManageBackend, PassKey, StoreKeyMethod};
+use aries_askar::{any::AnyStore, future::block_on, ManageBackend, PassKey, StoreKeyMethod, Argon2Level, KdfMethod};
+
 use serde_json::Value as JsonValue;
-use std::{fs, fs::File, io::Read};
+use std::fs;
 
 pub struct Wallet {}
 
@@ -30,64 +31,68 @@ pub struct ImportConfig {
     pub key: String,
 }
 
+struct AskarCredentials<'a> {
+    key: PassKey<'a>,
+    key_method: StoreKeyMethod,
+    rekey: Option<PassKey<'a>>,
+    rekey_method: Option<StoreKeyMethod>,
+}
+
 impl Wallet {
     pub fn create(config: &Config, credentials: &Credentials) -> CliResult<AnyStore> {
-        Self::init_wallet_directory(config)?;
-        let wallet_uri = Self::build_uri(config, credentials)?;
-        let (method, key) = Self::build_credentials(credentials)?;
+        Self::create_wallet_directory(config)?;
+        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+        let credentials1 = Self::build_credentials(credentials)?;
 
         block_on(async move {
-            wallet_uri
-                .provision_backend(method, key.as_ref(), None, false)
+            let store = wallet_uri
+                .provision_backend(credentials1.key_method, credentials1.key.as_ref(), None, false)
                 .await
-                .map_err(CliError::from)
+                .map_err(CliError::from)?;
+
+            Ok(store)
         })
     }
 
     pub fn open(config: &Config, credentials: &Credentials) -> CliResult<AnyStore> {
-        let wallet_uri = Self::build_uri(config, credentials)?;
-        let (method, key) = Self::build_credentials(credentials)?;
+        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+        let credentials = Self::build_credentials(credentials)?;
 
         block_on(async move {
-            wallet_uri
-                .open_backend(Some(method), key.as_ref(), None)
+            let mut store: AnyStore = wallet_uri
+                .open_backend(Some(credentials.key_method), credentials.key.as_ref(), None)
                 .await
-                .map_err(CliError::from)
+                .map_err(CliError::from)?;
+
+            if let (Some(rekey), Some(rekey_method)) = (credentials.rekey, credentials.rekey_method) {
+                store
+                    .rekey(rekey_method, rekey)
+                    .await?;
+            }
+
+            Ok(store)
         })
-    }
-
-    pub fn delete(config: &Config, credentials: &Credentials) -> CliResult<bool> {
-        let wallet_uri = Self::build_uri(config, credentials)?;
-
-        block_on(async move { wallet_uri.remove_backend().await.map_err(CliError::from) })
     }
 
     pub fn close(store: &AnyStore) -> CliResult<()> {
         block_on(async move { store.close().await.map_err(CliError::from) })
     }
 
-    pub fn list() -> Vec<JsonValue> {
-        let mut configs: Vec<JsonValue> = Vec::new();
+    pub fn delete(config: &Config, credentials: &Credentials) -> CliResult<bool> {
+        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
 
-        if let Ok(entries) = fs::read_dir(EnvironmentUtils::wallets_path()) {
-            for entry in entries {
-                let file = if let Ok(dir_entry) = entry {
-                    dir_entry
-                } else {
-                    continue;
-                };
-
-                let mut config_json = String::new();
-
-                File::open(file.path())
-                    .ok()
-                    .and_then(|mut f| f.read_to_string(&mut config_json).ok())
-                    .and_then(|_| serde_json::from_str::<JsonValue>(config_json.as_str()).ok())
-                    .map(|config| configs.push(config));
+        block_on(async move {
+            let removed = wallet_uri.remove_backend().await.map_err(CliError::from)?;
+            if !removed {
+                return Err(CliError::InvalidEntityState(format!("Unable to delete wallet {}", config.id)));
             }
-        }
+            Self::delete_wallet_directory(config)?;
+            Ok(removed)
+        })
+    }
 
-        configs
+    pub fn list() -> Vec<JsonValue> {
+        WalletConfig::list()
     }
 
     pub fn export(_store: &AnyStore, _export_config: &ExportConfig) -> CliResult<()> {
@@ -104,12 +109,23 @@ impl Wallet {
         // wallet::import_wallet(config, credentials, import_config_json).wait()
     }
 
-    fn init_wallet_directory(config: &Config) -> CliResult<()> {
+    fn create_wallet_directory(config: &Config) -> CliResult<()> {
         let path = EnvironmentUtils::wallet_path(&config.id);
+        if path.exists() {
+            return Err(CliError::Duplicate(format!("Wallet \"{}\" already exists", config.id)));
+        }
         fs::create_dir_all(path.as_path()).map_err(CliError::from)
     }
 
-    fn build_uri(config: &Config, credentials: &Credentials) -> CliResult<String> {
+    fn delete_wallet_directory(config: &Config) -> CliResult<()> {
+        let path = EnvironmentUtils::wallet_path(&config.id);
+        if !path.exists() {
+            return Err(CliError::NotFound(format!("Wallet \"{}\" does not exists", config.id)));
+        }
+        fs::remove_dir_all(path.as_path()).map_err(CliError::from)
+    }
+
+    fn build_wallet_uri(config: &Config, credentials: &Credentials) -> CliResult<String> {
         let storage_type = Self::map_storage_type(&config.storage_type)?;
         match storage_type {
             StorageType::Sqlite => Self::build_sqlite_uri(config, credentials),
@@ -185,15 +201,39 @@ impl Wallet {
         Ok(uri)
     }
 
-    fn build_credentials(credentials: &Credentials) -> CliResult<(StoreKeyMethod, PassKey)> {
-        let method = Self::map_key_derivation_method(
+    fn build_credentials(credentials: &Credentials) -> CliResult<AskarCredentials> {
+        let key_method = Self::map_key_derivation_method(
             credentials
                 .key_derivation_method
                 .as_ref()
                 .map(String::as_str),
         )?;
         let key = PassKey::from(credentials.key.to_string());
-        Ok((method, key))
+
+        let rekey = credentials.rekey.as_ref()
+            .map(|rekey| PassKey::from(rekey.to_string()));
+
+        let rekey_method = match credentials.rekey {
+            Some(_) => Some(
+                Self::map_key_derivation_method(
+                    credentials
+                        .rekey_derivation_method
+                        .as_ref()
+                        .map(String::as_str),
+                )?
+            ),
+            None => None
+        };
+
+
+        Ok(
+            AskarCredentials {
+                key,
+                key_method,
+                rekey,
+                rekey_method,
+            }
+        )
     }
 
     fn map_storage_type(storage_type: &str) -> CliResult<StorageType> {
@@ -201,7 +241,7 @@ impl Wallet {
             "default" | "sqlite" => Ok(StorageType::Sqlite),
             "postgres" => Ok(StorageType::Postgres),
             value => Err(CliError::InvalidInput(format!(
-                "Unsupported storage type {} provided",
+                "Unsupported storage type provided: {}",
                 value
             ))),
         }
@@ -209,11 +249,11 @@ impl Wallet {
 
     fn map_key_derivation_method(key: Option<&str>) -> CliResult<StoreKeyMethod> {
         match key {
-            None | Some("argon2m") => Ok(StoreKeyMethod::Unprotected),
-            Some("argon2i") => Ok(StoreKeyMethod::Unprotected),
+            None | Some("argon2m") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(Argon2Level::Moderate))),
+            Some("argon2i") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(Argon2Level::Interactive))),
             Some("raw") => Ok(StoreKeyMethod::RawKey),
             Some(value) => Err(CliError::InvalidInput(format!(
-                "Unsupported key derivation method provided {}",
+                "Unsupported key derivation method provided: {}",
                 value
             ))),
         }

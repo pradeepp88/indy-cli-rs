@@ -31,8 +31,10 @@ impl PoolConfig {
             let mut gt_fin = File::open(&config.genesis_txn)?;
             let mut gt_fout = File::create(path.as_path())?;
             io::copy(&mut gt_fin, &mut gt_fout)?;
-            path.pop();
         }
+        let txn_path = path.to_string_lossy().to_string();
+
+        path.pop();
 
         // store config file
         {
@@ -40,7 +42,7 @@ impl PoolConfig {
             path.set_extension("json");
 
             let pool_config = json!({
-                "genesis_txn": config.genesis_txn
+                "genesis_txn": txn_path
             });
 
             let mut f: File = File::create(path.as_path())?;
@@ -48,6 +50,13 @@ impl PoolConfig {
             f.flush()?;
         }
 
+        Ok(())
+    }
+
+    pub(crate) fn write_transactions(name: &str, transactions: &Vec<String>) -> Result<(), std::io::Error> {
+        let path = EnvironmentUtils::pool_transactions_path(name);
+        let mut f = File::create(path.as_path())?;
+        f.write_all(transactions.join("\n").as_bytes())?;
         Ok(())
     }
 

@@ -27,7 +27,7 @@ impl Pool {
             .map_err(CliError::from)
     }
 
-    pub fn refresh(pool: &LocalPool) -> CliResult<Option<LocalPool>> {
+    pub fn refresh(name: &str, pool: &LocalPool) -> CliResult<Option<LocalPool>> {
         let (transactions, _) = block_on(async move { perform_refresh(pool).await })?;
 
         match transactions {
@@ -38,6 +38,8 @@ impl Pool {
                 let pool = PoolBuilder::from(pool.get_config().to_owned())
                     .transactions(transactions)?
                     .into_local()?;
+
+                PoolConfig::write_transactions(name, &pool.get_json_transactions()?)?;
 
                 Ok(Some(pool))
             }
@@ -50,7 +52,6 @@ impl Pool {
     }
 
     pub fn close(_pool: &LocalPool) -> CliResult<()> {
-        // TODO: what should we do HERE?
         Ok(())
     }
 
