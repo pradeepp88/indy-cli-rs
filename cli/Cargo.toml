@@ -1,12 +1,11 @@
 [package]
-name = "indy-cli"
-version = "1.16.0"
-authors = ["Hyperledger Indy Contributors <hyperledger-indy@lists.hyperledger.org>"]
+name = "indy-cli-rs"
+version = "0.1.0"
+authors = ["Hyperledger Aries Contributors <aries@lists.hyperledger.org>"]
 license = "MIT/Apache-2.0"
+homepage = "https://github.com/hyperledger/indy-cli-rs.git"
 description = """\
-This is the official command line interface for Indy SDK,\
-which provides a distributed-ledger-based foundation for self-sovereign\
-identity."""
+This is command line interface for Indy, which provides a distributed-ledger-based foundation for self-sovereign identity."""
 edition = "2018"
 
 # Causes the build to fail on all warnings
@@ -45,10 +44,6 @@ assets = [
 maintainer-scripts = "./debian"
 changelog = "./debian/changelog"
 
-[package.metadata.deb.variants.indy-cli-xenial]
-name = "indy-cli"
-provides = "indy-cli (= 2.16.0)"
-
-[package.metadata.deb.variants.indy-cli-bionic]
-name = "indy-cli"
-provides = "indy-cli (= 2.16.0)"
+[package.metadata.deb.variants.indy-cli-rs-bionic]
+name = "indy-cli-rs"
+provides = "indy-cli-rs (= 0.1.0)"

@@ -1,3 +1,18 @@
+# This is a batch script demonstration mostly used operations and flows.
+# Requires an Indy Ledger yo be started: https://github.com/hyperledger/indy-vdr#connecting-to-a-ledger
+# Scenario:
+#   1. Create Trustee Wallet and DID
+#   2. Create Endorser Wallet and DID
+#   3. Trustee publish Endorser DID to the Indy Ledger
+#   4. Create Author Wallet and DID
+#   5. Trustee publish Author's DID to the Indy Ledger
+#   6. Author creates Schema transaction
+#   7. Endorser endorse the Schema transaction
+#   8. Endorser ensures the Schema is published
+#   9. Trustee apply Transaction Author Agreement on the Indy Ledger
+#   10. Endorser changes Wallet key
+#   11. Delete wallets and pools
+
 # Load plugin command is deprecated but kept to preserve coompatibility
 load-plugin library=libindystrgpostgres.so initializer=postgresstorage_init
 
@@ -20,7 +35,7 @@ pool create endorser_pool gen_txn_file=docker_pool_transactions_genesis
 pool connect endorser_pool
 pool disconnect
 
-# Ter Trustee publish Endorser Nym
+# Trustee publish Endorser Nym
 wallet open trustee_wallet key=trustee key_derivation_method=argon2i
 pool create trustee_pool gen_txn_file=docker_pool_transactions_genesis
 pool connect trustee_pool
@@ -30,26 +45,24 @@ ledger nym did=NKGKtcNwssToP5f7uhsEs4 verkey=~CGHoSykbaYtVEnEb89uXk9 role=ENDORS
 pool disconnect
 wallet close
 
-# Create Author Wallet
+# Create Author Wallet and DID
 wallet create author_wallet key=author_key key_derivation_method=argon2i
 wallet open author_wallet key=author_key key_derivation_method=argon2i
-
-# Create Author DID
 did new seed=0000000000000000000000000Author1
 did list
 did use 2eqFTRFTc5EYXCgXR38dzX
-
-# Create Author Schema
-ledger schema name=test_schema version=1.0 attr_names=name,surname endorser=NKGKtcNwssToP5f7uhsEs4 send=false
-ledger save-transaction file=txn.json
-wallet close
 
 # Trustee publish Author's Nym
 wallet open trustee_wallet key=trustee key_derivation_method=argon2i
 pool connect trustee_pool
 did list
 did use V4SGRU86Z58d6TV7PBUe6f
-ledger nym did=2eqFTRFTc5EYXCgXR38dzX verkey=~5x23rBEWrTtFFp2wrfv5c7 role=ENDORSER
+ledger nym did=2eqFTRFTc5EYXCgXR38dzX verkey=~5x23rBEWrTtFFp2wrfv5c7
+
+# Create Author Schema
+ledger schema name=test_schema version=1.0 attr_names=name,surname endorser=NKGKtcNwssToP5f7uhsEs4 send=false
+ledger save-transaction file=txn.json
+wallet close
 
 # Endorser endorse Author's Schema
 wallet open endorser_wallet key=endorser_key key_derivation_method=argon2i
@@ -91,5 +104,4 @@ wallet delete endorser_wallet key=endorser_key key_derivation_method=argon2i
 wallet delete author_wallet key=author_key key_derivation_method=argon2i
 pool delete trustee_pool
 pool delete endorser_pool
-
 exit

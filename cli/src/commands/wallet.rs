@@ -605,7 +605,6 @@ pub mod tests {
             tear_down();
         }
 
-        #[ignore]
         #[test]
         pub fn create_works_for_key_derivation_method() {
             let ctx = setup();
