@@ -451,7 +451,11 @@ use crate::tools::ledger::Ledger;
 use indy_vdr::pool::PreparedRequest;
 
 #[cfg(test)]
-pub fn submit_retry<F, T, E>(ctx: &CommandContext, request: &PreparedRequest, parser: F) -> Result<(), ()>
+pub fn submit_retry<F, T, E>(
+    ctx: &CommandContext,
+    request: &PreparedRequest,
+    parser: F,
+) -> Result<(), ()>
 where
     F: Fn(&str) -> Result<T, E>,
 {

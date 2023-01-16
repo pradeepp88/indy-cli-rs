@@ -169,8 +169,8 @@ pub mod nym_command {
             let did_info = Did::get_did_with_meta(&store, &target_did);
 
             if let Ok(ref did_info) = did_info {
-                let verkey_ =
-                    Did::abbreviate_verkey(&did_info.did, &did_info.verkey).unwrap_or(did_info.verkey.to_string());
+                let verkey_ = Did::abbreviate_verkey(&did_info.did, &did_info.verkey)
+                    .unwrap_or(did_info.verkey.to_string());
 
                 if verkey_ != target_verkey {
                     println_warn!(
@@ -196,7 +196,7 @@ pub mod nym_command {
             None,
             role,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         set_author_agreement(ctx, &mut request)?;
 
@@ -327,7 +327,7 @@ pub mod attrib_command {
             raw.as_ref(),
             enc,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         set_author_agreement(ctx, &mut request)?;
 
@@ -397,7 +397,7 @@ pub mod get_attrib_command {
             hash,
             enc,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, mut response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -1068,7 +1068,7 @@ pub mod pool_upgrade_command {
             force,
             package,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1281,8 +1281,8 @@ pub mod sign_multi_command {
 }
 
 pub mod auth_rule_command {
-    use indy_vdr::ledger::constants::txn_name_to_code;
     use super::*;
+    use indy_vdr::ledger::constants::txn_name_to_code;
 
     command!(CommandMetadata::build("auth-rule", "Send AUTH_RULE request to change authentication rules for a ledger transaction.")
                 .add_required_param("txn_type", "Ledger transaction alias or associated value")
@@ -1341,7 +1341,7 @@ pub mod auth_rule_command {
             new_value,
             constraint,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, mut response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1465,7 +1465,7 @@ pub mod get_auth_rule_command {
             old_value,
             new_value,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -1626,7 +1626,7 @@ pub mod taa_command {
             ratification_ts,
             retirement_ts,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1710,7 +1710,7 @@ pub mod aml_command {
             &version,
             context,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1762,7 +1762,7 @@ pub mod taa_disable_all_command {
             pool.as_deref(),
             &submitter_did,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1859,7 +1859,7 @@ pub mod get_acceptance_mechanisms_command {
             timestamp,
             version,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -2090,7 +2090,7 @@ pub fn set_author_agreement(ctx: &CommandContext, request: &mut PreparedRequest)
     let pool = get_connected_pool(&ctx);
 
     if let Some((text, version, acc_mech_type, time_of_acceptance)) =
-    get_transaction_author_info(&ctx)
+        get_transaction_author_info(&ctx)
     {
         if acc_mech_type.is_empty() {
             println_err!("Transaction author agreement Acceptance Mechanism isn't set.");
@@ -2106,7 +2106,7 @@ pub fn set_author_agreement(ctx: &CommandContext, request: &mut PreparedRequest)
             &acc_mech_type,
             time_of_acceptance,
         )
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        .map_err(|err| println_err!("{}", err.message(None)))?;
     };
     Ok(())
 }
@@ -2250,7 +2250,7 @@ fn get_role_title(role: &JsonValue) -> JsonValue {
             Some("201") => "NETWORK_MONITOR",
             _ => "-",
         }
-            .to_string(),
+        .to_string(),
     )
 }
 
@@ -2288,7 +2288,7 @@ fn get_txn_title(role: &JsonValue) -> JsonValue {
             Some(val) => val,
             _ => "-",
         }
-            .to_string(),
+        .to_string(),
     )
 }
 
@@ -2348,7 +2348,6 @@ pub struct ReplyResult<T> {
 
 #[cfg(test)]
 pub mod tests {
-    use std::ops::Deref;
     use super::*;
     use crate::commands::did::tests::{
         new_did, use_did, DID_MY1, DID_MY3, DID_TRUSTEE, SEED_MY3, SEED_TRUSTEE, VERKEY_MY1,
@@ -2360,6 +2359,7 @@ pub mod tests {
     };
     use crate::tools::did::Did;
     use crate::tools::ledger::Ledger;
+    use std::ops::Deref;
 
     const TRANSACTION: &str = r#"{"reqId":1,"identifier":"V4SGRU86Z58d6TV7PBUe6f","operation":{"type":"105","dest":"V4SGRU86Z58d6TV7PBUe6f"},"protocolVersion":2}"#;
 
@@ -4014,7 +4014,8 @@ pub mod tests {
             attr_names: AttributeNames::from(attr_names.as_slice()),
             seq_no: None,
         });
-        let mut schema_request = Ledger::build_schema_request(Some(pool.deref()), &did, schema).unwrap();
+        let mut schema_request =
+            Ledger::build_schema_request(Some(pool.deref()), &did, schema).unwrap();
         let schema_response =
             Ledger::sign_and_submit_request(pool.deref(), &wallet, &did, &mut schema_request)
                 .unwrap();
@@ -4059,7 +4060,8 @@ pub mod tests {
             None
         };
         let did = DidValue(did.to_string());
-        let request = Ledger::build_get_attrib_request(Some(&pool), None, &did, attr, hash, enc).unwrap();
+        let request =
+            Ledger::build_get_attrib_request(Some(&pool), None, &did, attr, hash, enc).unwrap();
         submit_retry(ctx, &request, |response| {
             serde_json::from_str::<Response<ReplyResult<String>>>(&response)
                 .map_err(|_| ())

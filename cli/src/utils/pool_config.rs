@@ -41,9 +41,7 @@ impl PoolConfig {
             path.push(name);
             path.set_extension("json");
 
-            let pool_config = json!({
-                "genesis_txn": txn_path
-            });
+            let pool_config = json!({ "genesis_txn": txn_path });
 
             let mut f: File = File::create(path.as_path())?;
             f.write_all(pool_config.to_string().as_bytes())?;
@@ -53,7 +51,10 @@ impl PoolConfig {
         Ok(())
     }
 
-    pub(crate) fn write_transactions(name: &str, transactions: &Vec<String>) -> Result<(), std::io::Error> {
+    pub(crate) fn write_transactions(
+        name: &str,
+        transactions: &Vec<String>,
+    ) -> Result<(), std::io::Error> {
         let path = EnvironmentUtils::pool_transactions_path(name);
         let mut f = File::create(path.as_path())?;
         f.write_all(transactions.join("\n").as_bytes())?;

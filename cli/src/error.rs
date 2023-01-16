@@ -78,7 +78,10 @@ impl CliError {
                     "Pool  \"{}\" genesis transactions file does not exist.",
                     extra.unwrap_or_default()
                 ),
-                VdrErrorKind::Input => format!("Invalid value provided for one of the parameters: {:?}", vdr_error.to_string()),
+                VdrErrorKind::Input => format!(
+                    "Invalid value provided for one of the parameters: {:?}",
+                    vdr_error.to_string()
+                ),
                 VdrErrorKind::Resource => format!("Unable to send request."),
                 VdrErrorKind::Unavailable => format!("Pool unavailable."),
                 VdrErrorKind::Unexpected => format!(

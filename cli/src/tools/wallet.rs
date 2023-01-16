@@ -2,7 +2,9 @@ use crate::error::{CliError, CliResult};
 use crate::utils::environment::EnvironmentUtils;
 use crate::utils::wallet_config::{Config, WalletConfig};
 
-use aries_askar::{any::AnyStore, future::block_on, ManageBackend, PassKey, StoreKeyMethod, Argon2Level, KdfMethod};
+use aries_askar::{
+    any::AnyStore, future::block_on, Argon2Level, KdfMethod, ManageBackend, PassKey, StoreKeyMethod,
+};
 
 use serde_json::Value as JsonValue;
 use std::fs;
@@ -46,7 +48,12 @@ impl Wallet {
 
         block_on(async move {
             let store = wallet_uri
-                .provision_backend(credentials1.key_method, credentials1.key.as_ref(), None, false)
+                .provision_backend(
+                    credentials1.key_method,
+                    credentials1.key.as_ref(),
+                    None,
+                    false,
+                )
                 .await
                 .map_err(CliError::from)?;
 
@@ -69,10 +76,9 @@ impl Wallet {
                 .await
                 .map_err(CliError::from)?;
 
-            if let (Some(rekey), Some(rekey_method)) = (credentials.rekey, credentials.rekey_method) {
-                store
-                    .rekey(rekey_method, rekey)
-                    .await?;
+            if let (Some(rekey), Some(rekey_method)) = (credentials.rekey, credentials.rekey_method)
+            {
+                store.rekey(rekey_method, rekey).await?;
             }
 
             Ok(store)
@@ -93,7 +99,10 @@ impl Wallet {
         block_on(async move {
             let removed = wallet_uri.remove_backend().await.map_err(CliError::from)?;
             if !removed {
-                return Err(CliError::InvalidEntityState(format!("Unable to delete wallet {}", config.id)));
+                return Err(CliError::InvalidEntityState(format!(
+                    "Unable to delete wallet {}",
+                    config.id
+                )));
             }
             Self::delete_wallet_directory(config)?;
             Ok(removed)
@@ -121,7 +130,10 @@ impl Wallet {
     fn create_wallet_directory(config: &Config) -> CliResult<()> {
         let path = EnvironmentUtils::wallet_path(&config.id);
         if path.exists() {
-            return Err(CliError::Duplicate(format!("Wallet \"{}\" already exists", config.id)));
+            return Err(CliError::Duplicate(format!(
+                "Wallet \"{}\" already exists",
+                config.id
+            )));
         }
         fs::create_dir_all(path.as_path()).map_err(CliError::from)
     }
@@ -129,7 +141,10 @@ impl Wallet {
     fn delete_wallet_directory(config: &Config) -> CliResult<()> {
         let path = EnvironmentUtils::wallet_path(&config.id);
         if !path.exists() {
-            return Err(CliError::NotFound(format!("Wallet \"{}\" does not exists", config.id)));
+            return Err(CliError::NotFound(format!(
+                "Wallet \"{}\" does not exists",
+                config.id
+            )));
         }
         fs::remove_dir_all(path.as_path()).map_err(CliError::from)
     }
@@ -219,30 +234,27 @@ impl Wallet {
         )?;
         let key = PassKey::from(credentials.key.to_string());
 
-        let rekey = credentials.rekey.as_ref()
+        let rekey = credentials
+            .rekey
+            .as_ref()
             .map(|rekey| PassKey::from(rekey.to_string()));
 
         let rekey_method = match credentials.rekey {
-            Some(_) => Some(
-                Self::map_key_derivation_method(
-                    credentials
-                        .rekey_derivation_method
-                        .as_ref()
-                        .map(String::as_str),
-                )?
-            ),
-            None => None
+            Some(_) => Some(Self::map_key_derivation_method(
+                credentials
+                    .rekey_derivation_method
+                    .as_ref()
+                    .map(String::as_str),
+            )?),
+            None => None,
         };
 
-
-        Ok(
-            AskarCredentials {
-                key,
-                key_method,
-                rekey,
-                rekey_method,
-            }
-        )
+        Ok(AskarCredentials {
+            key,
+            key_method,
+            rekey,
+            rekey_method,
+        })
     }
 
     fn map_storage_type(storage_type: &str) -> CliResult<StorageType> {
@@ -258,8 +270,12 @@ impl Wallet {
 
     fn map_key_derivation_method(key: Option<&str>) -> CliResult<StoreKeyMethod> {
         match key {
-            None | Some("argon2m") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(Argon2Level::Moderate))),
-            Some("argon2i") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(Argon2Level::Interactive))),
+            None | Some("argon2m") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(
+                Argon2Level::Moderate,
+            ))),
+            Some("argon2i") => Ok(StoreKeyMethod::DeriveKey(KdfMethod::Argon2i(
+                Argon2Level::Interactive,
+            ))),
             Some("raw") => Ok(StoreKeyMethod::RawKey),
             Some(value) => Err(CliError::InvalidInput(format!(
                 "Unsupported key derivation method provided: {}",

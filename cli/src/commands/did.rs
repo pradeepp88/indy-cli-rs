@@ -2,11 +2,11 @@ use crate::command_executor::{
     Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
     DynamicCompletionType,
 };
-use crate::commands::*;
 use crate::commands::ledger::{handle_transaction_response, Response};
-use crate::utils::table::print_list_table;
+use crate::commands::*;
 use crate::tools::did::Did;
 use crate::tools::ledger::Ledger;
+use crate::utils::table::print_list_table;
 
 pub mod group {
     use super::*;
@@ -113,12 +113,14 @@ pub mod import_command {
         }
 
         for did in config.dids {
-            let (did, vk) = Did::new(&store,
-                                     did.did.as_ref().map(String::as_str),
-                                     Some(&did.seed),
-                                     None,
-                                     None)
-                .map_err(|err| println_err!("{}", err.message(None)))?;
+            let (did, vk) = Did::new(
+                &store,
+                did.did.as_ref().map(String::as_str),
+                Some(&did.seed),
+                None,
+                None,
+            )
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
             let vk = Did::abbreviate_verkey(&did, &vk)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
@@ -501,7 +503,16 @@ pub mod tests {
             }
             let dids = get_dids(&ctx);
             assert_eq!(1, dids.len());
-            assert_eq!(dids.get(0).as_ref().unwrap().metadata.as_ref().unwrap().to_string(), metadata.to_string());
+            assert_eq!(
+                dids.get(0)
+                    .as_ref()
+                    .unwrap()
+                    .metadata
+                    .as_ref()
+                    .unwrap()
+                    .to_string(),
+                metadata.to_string()
+            );
 
             tear_down_with_wallet(&ctx);
         }
@@ -658,7 +669,7 @@ pub mod tests {
             let pool = get_connected_pool(&ctx).unwrap();
             let wallet = ensure_opened_store(ctx).unwrap();
             let did = DidValue(did.to_string());
-            let mut request = Ledger::build_get_nym_request(Some(&pool),None, &did).unwrap();
+            let mut request = Ledger::build_get_nym_request(Some(&pool), None, &did).unwrap();
             Ledger::sign_request(&wallet, &did, &mut request).unwrap();
             submit_retry(ctx, &request, |response| {
                 let res = req_for_nym(response);
@@ -667,7 +678,7 @@ pub mod tests {
                     _ => Err(()),
                 }
             })
-                .unwrap()
+            .unwrap()
         }
 
         fn req_for_nym(response: &str) -> Option<String> {
@@ -722,7 +733,8 @@ pub mod tests {
             let new_verkey = Did::replace_keys_start(&wallet, &did, None).unwrap();
             let did = DidValue(did.to_string());
             let mut request =
-                Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None).unwrap();
+                Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None)
+                    .unwrap();
             Ledger::sign_and_submit_request(&pool, &wallet, &did, &mut request).unwrap();
             ensure_nym_written(&ctx, &did, &new_verkey);
 

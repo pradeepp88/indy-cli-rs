@@ -135,8 +135,8 @@ pub mod connect_command {
             close_pool(ctx, &pool, &name)?;
         }
 
-        let pool = Pool::open(name, config)
-            .map_err(|err| println_err!("{}", err.message(Some(&name))))?;
+        let pool =
+            Pool::open(name, config).map_err(|err| println_err!("{}", err.message(Some(&name))))?;
 
         set_connected_pool(ctx, Some((pool, name.to_owned())));
         println_succ!("Pool \"{}\" has been connected", name);
@@ -630,7 +630,8 @@ pub mod tests {
     mod refresh {
         use super::*;
 
-        #[ignore] // FIXME: For some reason refresh does not work with with VON network but works with Staging and Prod
+        #[ignore]
+        // FIXME: For some reason refresh does not work with with VON network but works with Staging and Prod
         #[test]
         pub fn refresh_works() {
             let ctx = setup();

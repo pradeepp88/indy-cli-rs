@@ -14,9 +14,13 @@ pub mod about_command {
     fn execute(_ctx: &CommandContext, _params: &CommandParams) -> CommandResult {
         trace!("execute >> _ctx: params: {:?}", _params);
 
-        println_succ!("Hyperledger Aries Indy CLI (https://github.com/hyperledger/indy-cli-rs.git)");
+        println_succ!(
+            "Hyperledger Aries Indy CLI (https://github.com/hyperledger/indy-cli-rs.git)"
+        );
         println!();
-        println_succ!("This is CLI tool for Hyperledger Indy (https://www.hyperledger.org/projects),");
+        println_succ!(
+            "This is CLI tool for Hyperledger Indy (https://www.hyperledger.org/projects),"
+        );
         println_succ!("which provides a distributed-ledger-based foundation for");
         println_succ!("self-sovereign identity (https://sovrin.org/).");
         println!();

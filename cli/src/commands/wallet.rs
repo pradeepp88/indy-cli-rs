@@ -233,7 +233,7 @@ pub mod close_command {
             close_wallet(ctx, &store, &id)?;
         } else {
             println_err!("There is no opened wallet now");
-            return Err(())
+            return Err(());
         }
 
         trace!("CloseCommand::execute <<");

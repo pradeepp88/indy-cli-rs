@@ -6,8 +6,8 @@ use aries_askar::{
     kms::{KeyAlg, LocalKey},
     Entry, EntryTag,
 };
-use indy_utils::{base58, base64, did::DidValue, keys::EncodedVerKey, Qualifiable};
 use hex::FromHex;
+use indy_utils::{base58, base64, did::DidValue, keys::EncodedVerKey, Qualifiable};
 
 pub struct Did {}
 
@@ -39,7 +39,7 @@ impl Did {
             let public_key = keypair.to_public_bytes()?;
             let mut did = match did {
                 Some(did) => did.to_string(),
-                None => base58::encode(&public_key[0..16])
+                None => base58::encode(&public_key[0..16]),
             };
 
             let existing_did = Self::fetch_did(store, &did, false).await?;
@@ -166,9 +166,11 @@ impl Did {
 
     pub fn qualify_did(store: &AnyStore, did: &DidValue, method: &str) -> CliResult<String> {
         block_on(async {
-            let (entry, did_info) = Self::fetch_did(store, &did.to_string(), true).await?.ok_or_else(|| {
-                CliError::NotFound(format!("DID {} does not exits in the wallet!", did))
-            })?;
+            let (entry, did_info) = Self::fetch_did(store, &did.to_string(), true)
+                .await?
+                .ok_or_else(|| {
+                    CliError::NotFound(format!("DID {} does not exits in the wallet!", did))
+                })?;
 
             let qualified_did = did
                 .to_qualified(method)
@@ -241,13 +243,12 @@ impl Did {
         }
     }
 
-    async fn remove_did(
-        store: &AnyStore,
-        name: &str,
-    ) -> CliResult<()> {
+    async fn remove_did(store: &AnyStore, name: &str) -> CliResult<()> {
         let mut session = store.session(None).await?;
         session
-            .remove(CATEGORY_DID, name).await.map_err(CliError::from)
+            .remove(CATEGORY_DID, name)
+            .await
+            .map_err(CliError::from)
     }
 
     async fn fetch_did(
@@ -294,18 +295,22 @@ impl Did {
             if decoded.len() == SEED_BYTES {
                 Ok(decoded)
             } else {
-                Err(CliError::InvalidInput(
-                    format!("Trying to use invalid base64 encoded `seed`. \
-                                   The number of bytes must be {} ", SEED_BYTES)))
+                Err(CliError::InvalidInput(format!(
+                    "Trying to use invalid base64 encoded `seed`. \
+                                   The number of bytes must be {} ",
+                    SEED_BYTES
+                )))
             }
         } else if seed.as_bytes().len() == SEED_BYTES * 2 {
             // is hex string
-            Vec::from_hex(seed)
-                .map_err(|_| CliError::InvalidInput(format!("Seed is invalid hex")))
+            Vec::from_hex(seed).map_err(|_| CliError::InvalidInput(format!("Seed is invalid hex")))
         } else {
-            Err(CliError::InvalidInput(
-                format!("Trying to use invalid `seed`. It can be either \
-                               {} bytes string or base64 string or {} bytes HEX string", SEED_BYTES, SEED_BYTES * 2)))
+            Err(CliError::InvalidInput(format!(
+                "Trying to use invalid `seed`. It can be either \
+                               {} bytes string or base64 string or {} bytes HEX string",
+                SEED_BYTES,
+                SEED_BYTES * 2
+            )))
         }
     }
 }
