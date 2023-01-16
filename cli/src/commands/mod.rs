@@ -447,19 +447,21 @@ pub fn extract_error_message(error: &str) -> String {
 
 #[cfg(test)]
 use crate::tools::ledger::Ledger;
+#[cfg(test)]
+use indy_vdr::pool::PreparedRequest;
 
 #[cfg(test)]
-pub fn submit_retry<F, T, E>(ctx: &CommandContext, request: &str, parser: F) -> Result<(), ()>
+pub fn submit_retry<F, T, E>(ctx: &CommandContext, request: &PreparedRequest, parser: F) -> Result<(), ()>
 where
     F: Fn(&str) -> Result<T, E>,
 {
     const SUBMIT_RETRY_CNT: usize = 3;
     const SUBMIT_TIMEOUT_SEC: u64 = 2;
 
-    let pool_handle = ensure_connected_pool_handle(ctx).unwrap();
+    let pool = ensure_connected_pool_handle(ctx).unwrap();
 
     for _ in 0..SUBMIT_RETRY_CNT {
-        let response = Ledger::submit_request(pool_handle, request).unwrap();
+        let response = Ledger::submit_request(pool.as_ref(), request).unwrap();
         if parser(&response).is_ok() {
             return Ok(());
         }

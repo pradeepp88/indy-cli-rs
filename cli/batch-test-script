@@ -1,0 +1,95 @@
+# Load plugin command is deprecated but kept to preserve coompatibility
+load-plugin library=libindystrgpostgres.so initializer=postgresstorage_init
+
+# Create Trustee Wallet and DID
+wallet create trustee_wallet key=trustee storage_type=sqlite key_derivation_method=argon2i
+wallet open trustee_wallet key=trustee key_derivation_method=argon2i
+did new seed=000000000000000000000000Trustee1
+did list
+wallet close
+
+# Create Endorser Wallet and DID
+wallet create endorser_wallet key=endorser_key key_derivation_method=argon2i
+wallet open endorser_wallet key=endorser_key key_derivation_method=argon2i
+did new seed=00000000000000000000000Endorser1
+did list
+wallet close
+
+# Create Endorser Pool
+pool create endorser_pool gen_txn_file=docker_pool_transactions_genesis
+pool connect endorser_pool
+pool disconnect
+
+# Ter Trustee publish Endorser Nym
+wallet open trustee_wallet key=trustee key_derivation_method=argon2i
+pool create trustee_pool gen_txn_file=docker_pool_transactions_genesis
+pool connect trustee_pool
+did list
+did use V4SGRU86Z58d6TV7PBUe6f
+ledger nym did=NKGKtcNwssToP5f7uhsEs4 verkey=~CGHoSykbaYtVEnEb89uXk9 role=ENDORSER
+pool disconnect
+wallet close
+
+# Create Author Wallet
+wallet create author_wallet key=author_key key_derivation_method=argon2i
+wallet open author_wallet key=author_key key_derivation_method=argon2i
+
+# Create Author DID
+did new seed=0000000000000000000000000Author1
+did list
+did use 2eqFTRFTc5EYXCgXR38dzX
+
+# Create Author Schema
+ledger schema name=test_schema version=1.0 attr_names=name,surname endorser=NKGKtcNwssToP5f7uhsEs4 send=false
+ledger save-transaction file=txn.json
+wallet close
+
+# Trustee publish Author's Nym
+wallet open trustee_wallet key=trustee key_derivation_method=argon2i
+pool connect trustee_pool
+did list
+did use V4SGRU86Z58d6TV7PBUe6f
+ledger nym did=2eqFTRFTc5EYXCgXR38dzX verkey=~5x23rBEWrTtFFp2wrfv5c7 role=ENDORSER
+
+# Endorser endorse Author's Schema
+wallet open endorser_wallet key=endorser_key key_derivation_method=argon2i
+pool connect endorser_pool
+did list
+did use NKGKtcNwssToP5f7uhsEs4
+ledger load-transaction file=txn.json
+ledger sign-multi
+ledger save-transaction file=txn.json
+ledger custom context
+ledger get-schema did=2eqFTRFTc5EYXCgXR38dzX name=test_schema version=1.0
+wallet close
+pool disconnect
+
+# Trustee apply TAA
+wallet open trustee_wallet key=trustee key_derivation_method=argon2i
+pool connect trustee_pool
+did list
+did use V4SGRU86Z58d6TV7PBUe6f
+ledger txn-acceptance-mechanisms aml={"on_click":"some description"} version=1.0
+ledger txn-author-agreement text="Indy transaction agreement" version=1 ratification-timestamp=123456789
+ledger get-acceptance-mechanisms
+pool show-taa
+wallet close
+pool disconnect
+
+# Rekey wallet
+wallet open endorser_wallet key=endorser_key key_derivation_method=argon2i rekey=endorser rekey_derivation_method=argon2i
+did list
+wallet close
+wallet open endorser_wallet key=endorser_key key_derivation_method=argon2i
+wallet open endorser_wallet key=endorser key_derivation_method=argon2i
+did list
+wallet close
+
+# Clean
+wallet delete trustee_wallet key=trustee key_derivation_method=argon2i
+wallet delete endorser_wallet key=endorser_key key_derivation_method=argon2i
+wallet delete author_wallet key=author_key key_derivation_method=argon2i
+pool delete trustee_pool
+pool delete endorser_pool
+
+exit

@@ -116,10 +116,10 @@ dependencies = [
 [[package]]
 name = "aries-askar"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0103b494f74a2d64fd391cd020389016e6c315229684d060412bc82eae49436"
+source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
 dependencies = [
  "askar-crypto",
+ "askar-wql",
  "async-lock",
  "async-stream",
  "bs58 0.4.0",
@@ -130,7 +130,6 @@ dependencies = [
  "futures-lite",
  "hex",
  "hmac 0.12.1",
- "indy-wql",
  "itertools",
  "log",
  "num_cpus",
@@ -163,8 +162,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "askar-crypto"
 version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f79d13c52b9acb5bc6b0d6b97f471bcf9679bd3113087d3d2e7132a09570d2c"
+source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
 dependencies = [
  "aead",
  "aes",
@@ -193,6 +191,15 @@ dependencies = [
  "subtle",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "askar-wql"
+version = "0.1.0"
+source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1345,6 +1352,7 @@ dependencies = [
  "chrono",
  "dirs 1.0.5",
  "failure_derive",
+ "hex",
  "indy-utils",
  "indy-vdr",
  "linefeed",

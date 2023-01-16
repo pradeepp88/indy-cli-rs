@@ -50,6 +50,11 @@ impl Wallet {
                 .await
                 .map_err(CliError::from)?;
 
+            // Askar Error
+            // If we have any opened store when later delete the wallet deletion will return ok
+            // But next we can recreate wallet with the same same record
+            store.close().await?;
+
             Ok(store)
         })
     }
@@ -80,6 +85,10 @@ impl Wallet {
 
     pub fn delete(config: &Config, credentials: &Credentials) -> CliResult<bool> {
         let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+
+        // Workaround to check that provided credentials are correct because Askar does not perform this check on delete call
+        let store = Self::open(config, credentials)?;
+        Self::close(&store)?;
 
         block_on(async move {
             let removed = wallet_uri.remove_backend().await.map_err(CliError::from)?;

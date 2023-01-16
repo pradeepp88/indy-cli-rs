@@ -13,7 +13,7 @@ edition = "2018"
 fatal_warnings = []
 
 [dependencies]
-aries-askar = "0.2.7"
+aries-askar = { git = "https://github.com/Artemkaaas/aries-askar.git" }
 indy-vdr = "0.3.4"
 indy-utils = "0.5.0"
 atty = "0.2"
@@ -33,6 +33,7 @@ term = "0.4.6"
 rpassword = "1.0.0"
 failure_derive = "0.1.8"
 thiserror = "1.0.38"
+hex = "0.4.3"
 
 [package.metadata.deb]
 depends = "libncursesw5-dev"

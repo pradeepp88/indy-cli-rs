@@ -111,7 +111,7 @@ impl CliError {
                 }
                 AskarErrorKind::Duplicate => format!(
                     "Record already exist in the wallet \"{}\".",
-                    extra.unwrap_or_default()
+                    askar_error.to_string()
                 ),
                 AskarErrorKind::Encryption => format!(
                     "Invalid key provided for the wallet \"{}\"",

@@ -6,14 +6,16 @@ use aries_askar::{
     kms::{KeyAlg, LocalKey},
     Entry, EntryTag,
 };
-use indy_utils::{base58, did::DidValue, keys::EncodedVerKey, Qualifiable};
+use indy_utils::{base58, base64, did::DidValue, keys::EncodedVerKey, Qualifiable};
+use hex::FromHex;
 
 pub struct Did {}
 
 const CATEGORY_DID: &'static str = "did";
 const KEY_TYPE: &'static str = "ed25519";
+const SEED_BYTES: usize = 32;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DidInfo {
     pub did: String,
     pub verkey: String,
@@ -35,7 +37,7 @@ impl Did {
             let (keypair, verkey) = Did::create_key(store, seed, metadata).await?;
 
             let public_key = keypair.to_public_bytes()?;
-            let did = match did {
+            let mut did = match did {
                 Some(did) => did.to_string(),
                 None => base58::encode(&public_key[0..16])
             };
@@ -52,6 +54,7 @@ impl Did {
                 EntryTag::Encrypted("verkey_type".to_string(), KEY_TYPE.to_string()),
             ];
             if let Some(method) = method {
+                did = DidValue(did.to_string()).to_qualified(method)?.to_string();
                 tags.push(EntryTag::Encrypted(
                     "method".to_string(),
                     method.to_string(),
@@ -114,7 +117,7 @@ impl Did {
         })
     }
 
-    pub fn set_metadata(store: &AnyStore, did: &str, metadata: &str) -> CliResult<()> {
+    pub fn _set_metadata(store: &AnyStore, did: &str, metadata: &str) -> CliResult<()> {
         block_on(async move {
             let (did_entry, mut did_info) =
                 Self::fetch_did(store, &did, true).await?.ok_or_else(|| {
@@ -155,16 +158,33 @@ impl Did {
     }
 
     pub fn abbreviate_verkey(did: &str, verkey: &str) -> CliResult<String> {
-        EncodedVerKey::from_did_and_verkey(did, verkey)?
-            .abbreviated_for_did(did)
+        let did = DidValue(did.to_string()).to_short().to_string();
+        EncodedVerKey::from_did_and_verkey(&did, verkey)?
+            .abbreviated_for_did(&did)
             .map_err(CliError::from)
     }
 
-    pub fn qualify_did(did: &str, method: &str) -> CliResult<String> {
-        DidValue(did.to_string())
-            .to_qualified(method)
-            .map(|did| did.to_string())
-            .map_err(|_| CliError::InvalidInput(format!("Invalid DID {} provided.", did)))
+    pub fn qualify_did(store: &AnyStore, did: &DidValue, method: &str) -> CliResult<String> {
+        block_on(async {
+            let (entry, did_info) = Self::fetch_did(store, &did.to_string(), true).await?.ok_or_else(|| {
+                CliError::NotFound(format!("DID {} does not exits in the wallet!", did))
+            })?;
+
+            let qualified_did = did
+                .to_qualified(method)
+                .map(|did| did.to_string())
+                .map_err(|_| CliError::InvalidInput(format!("Invalid DID {} provided.", did)))?;
+
+            Self::remove_did(store, &did.to_string()).await?;
+
+            let did_info = DidInfo {
+                did: qualified_did.clone(),
+                ..did_info
+            };
+            Self::store_did(store, &did_info, Some(&entry.tags), true).await?;
+
+            Ok(qualified_did)
+        })
     }
 
     pub async fn sign(store: &AnyStore, did: &str, bytes: &[u8]) -> CliResult<Vec<u8>> {
@@ -181,18 +201,14 @@ impl Did {
     ) -> CliResult<(LocalKey, String)> {
         let keypair = match seed {
             Some(seed) => {
-                println!("{:?}", seed);
-                LocalKey::from_secret_bytes(KeyAlg::Ed25519, seed.as_bytes())?
+                let seed_bytes = Self::convert_seed(seed)?;
+                LocalKey::from_secret_bytes(KeyAlg::Ed25519, seed_bytes.as_slice())?
             }
             None => LocalKey::generate(KeyAlg::Ed25519, false)?,
         };
 
         let public_key = keypair.to_public_bytes()?;
-        let secret_key = keypair.to_secret_bytes()?;
         let verkey = base58::encode(public_key);
-        let secret = base58::encode(secret_key);
-        println!("{}", verkey);
-        println!("{}", secret);
 
         let mut session = store.session(None).await?;
         session
@@ -223,6 +239,15 @@ impl Did {
                 .await
                 .map_err(CliError::from)
         }
+    }
+
+    async fn remove_did(
+        store: &AnyStore,
+        name: &str,
+    ) -> CliResult<()> {
+        let mut session = store.session(None).await?;
+        session
+            .remove(CATEGORY_DID, name).await.map_err(CliError::from)
     }
 
     async fn fetch_did(
@@ -256,5 +281,31 @@ impl Did {
             })?
             .load_local_key()
             .map_err(CliError::from)
+    }
+
+    fn convert_seed(seed: &str) -> CliResult<Vec<u8>> {
+        if seed.as_bytes().len() == SEED_BYTES {
+            // is acceptable seed length
+            Ok(seed.as_bytes().to_vec())
+        } else if seed.ends_with('=') {
+            // is base64 string
+            let decoded = base64::decode(&seed)
+                .map_err(|_| CliError::InvalidInput(format!("Invalid seed provided.")))?;
+            if decoded.len() == SEED_BYTES {
+                Ok(decoded)
+            } else {
+                Err(CliError::InvalidInput(
+                    format!("Trying to use invalid base64 encoded `seed`. \
+                                   The number of bytes must be {} ", SEED_BYTES)))
+            }
+        } else if seed.as_bytes().len() == SEED_BYTES * 2 {
+            // is hex string
+            Vec::from_hex(seed)
+                .map_err(|_| CliError::InvalidInput(format!("Seed is invalid hex")))
+        } else {
+            Err(CliError::InvalidInput(
+                format!("Trying to use invalid `seed`. It can be either \
+                               {} bytes string or base64 string or {} bytes HEX string", SEED_BYTES, SEED_BYTES * 2)))
+        }
     }
 }

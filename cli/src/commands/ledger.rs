@@ -108,7 +108,8 @@ macro_rules! send_request {
 macro_rules! get_transaction_to_use {
     ($ctx:expr, $param_txn:expr) => ({
         if let Some(txn_) = $param_txn {
-            PreparedRequest::from_request_json(&txn_).unwrap()
+            PreparedRequest::from_request_json(&txn_)
+                .map_err(|_| println_err!("Invalid formatted transaction provided."))?
         } else if let Some(txn_) = get_transaction($ctx) {
             println!("Transaction stored into context: {:?}.", txn_);
             println!("Would you like to use it? (y/n)");
@@ -120,7 +121,8 @@ macro_rules! get_transaction_to_use {
                 return Ok(());
             }
 
-            PreparedRequest::from_request_json(&txn_).unwrap()
+            PreparedRequest::from_request_json(&txn_)
+                .map_err(|_| println_err!("Invalid formatted transaction provided."))?
         } else {
             println_err!("There is not a transaction to use.");
             println!("You either need to explicitly pass transaction as a parameter, or \
@@ -164,23 +166,24 @@ pub mod nym_command {
         let role = get_opt_empty_str_param("role", params).map_err(error_err!())?;
 
         if let Some(target_verkey) = verkey {
-            let did_info = Did::get_did_with_meta(&store, &target_did)
-                .map_err(|err| println_err!("{}", err.message(None)))?;
+            let did_info = Did::get_did_with_meta(&store, &target_did);
 
-            let verkey_ =
-                Did::abbreviate_verkey(&did_info.did, &did_info.verkey).unwrap_or(did_info.verkey);
+            if let Ok(ref did_info) = did_info {
+                let verkey_ =
+                    Did::abbreviate_verkey(&did_info.did, &did_info.verkey).unwrap_or(did_info.verkey.to_string());
 
-            if verkey_ != target_verkey {
-                println_warn!(
+                if verkey_ != target_verkey {
+                    println_warn!(
                     "There is the same `DID` stored in the wallet but with different Verkey: {:?}",
                     verkey_
                 );
-                println_warn!("Do you really want to change Verkey on the ledger? (y/n)");
+                    println_warn!("Do you really want to change Verkey on the ledger? (y/n)");
 
-                let change_nym = crate::command_executor::wait_for_user_reply(ctx);
-                if !change_nym {
-                    println!("The transaction has not been sent.");
-                    return Ok(());
+                    let change_nym = crate::command_executor::wait_for_user_reply(ctx);
+                    if !change_nym {
+                        println!("The transaction has not been sent.");
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -193,7 +196,7 @@ pub mod nym_command {
             None,
             role,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         set_author_agreement(ctx, &mut request)?;
 
@@ -324,7 +327,7 @@ pub mod attrib_command {
             raw.as_ref(),
             enc,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         set_author_agreement(ctx, &mut request)?;
 
@@ -394,7 +397,7 @@ pub mod get_attrib_command {
             hash,
             enc,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, mut response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -1065,7 +1068,7 @@ pub mod pool_upgrade_command {
             force,
             package,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1176,7 +1179,8 @@ pub mod custom_command {
             }
         }
 
-        let mut transaction = PreparedRequest::from_request_json(transaction).unwrap();
+        let mut transaction = PreparedRequest::from_request_json(transaction)
+            .map_err(|_| println_err!("Invalid formatted transaction provided."))?;
 
         let response = if sign {
             let (store, _) = ensure_opened_wallet(&ctx)?;
@@ -1277,6 +1281,7 @@ pub mod sign_multi_command {
 }
 
 pub mod auth_rule_command {
+    use indy_vdr::ledger::constants::txn_name_to_code;
     use super::*;
 
     command!(CommandMetadata::build("auth-rule", "Send AUTH_RULE request to change authentication rules for a ledger transaction.")
@@ -1323,17 +1328,20 @@ pub mod auth_rule_command {
         let new_value = get_opt_str_param("new_value", params).map_err(error_err!())?;
         let constraint = get_str_param("constraint", params).map_err(error_err!())?;
 
+        let txn_type = txn_name_to_code(txn_type)
+            .ok_or_else(|| println_err!("Unsupported ledger transaction."))?;
+
         let mut request = Ledger::build_auth_rule_request(
             pool.as_deref(),
             &submitter_did,
-            txn_type,
+            &txn_type,
             &action.to_uppercase(),
             field,
             old_value,
             new_value,
             constraint,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, mut response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1457,7 +1465,7 @@ pub mod get_auth_rule_command {
             old_value,
             new_value,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -1618,7 +1626,7 @@ pub mod taa_command {
             ratification_ts,
             retirement_ts,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1702,7 +1710,7 @@ pub mod aml_command {
             &version,
             context,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1754,7 +1762,7 @@ pub mod taa_disable_all_command {
             pool.as_deref(),
             &submitter_did,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response): (String, Response<JsonValue>) = send_write_request!(
             ctx,
@@ -1851,7 +1859,7 @@ pub mod get_acceptance_mechanisms_command {
             timestamp,
             version,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
 
@@ -2082,7 +2090,7 @@ pub fn set_author_agreement(ctx: &CommandContext, request: &mut PreparedRequest)
     let pool = get_connected_pool(&ctx);
 
     if let Some((text, version, acc_mech_type, time_of_acceptance)) =
-        get_transaction_author_info(&ctx)
+    get_transaction_author_info(&ctx)
     {
         if acc_mech_type.is_empty() {
             println_err!("Transaction author agreement Acceptance Mechanism isn't set.");
@@ -2098,7 +2106,7 @@ pub fn set_author_agreement(ctx: &CommandContext, request: &mut PreparedRequest)
             &acc_mech_type,
             time_of_acceptance,
         )
-        .map_err(|err| println_err!("{}", err.message(None)))?;
+            .map_err(|err| println_err!("{}", err.message(None)))?;
     };
     Ok(())
 }
@@ -2242,7 +2250,7 @@ fn get_role_title(role: &JsonValue) -> JsonValue {
             Some("201") => "NETWORK_MONITOR",
             _ => "-",
         }
-        .to_string(),
+            .to_string(),
     )
 }
 
@@ -2280,7 +2288,7 @@ fn get_txn_title(role: &JsonValue) -> JsonValue {
             Some(val) => val,
             _ => "-",
         }
-        .to_string(),
+            .to_string(),
     )
 }
 
@@ -2340,6 +2348,7 @@ pub struct ReplyResult<T> {
 
 #[cfg(test)]
 pub mod tests {
+    use std::ops::Deref;
     use super::*;
     use crate::commands::did::tests::{
         new_did, use_did, DID_MY1, DID_MY3, DID_TRUSTEE, SEED_MY3, SEED_TRUSTEE, VERKEY_MY1,
@@ -3587,7 +3596,7 @@ pub mod tests {
             {
                 let cmd = sign_multi_command::new();
                 let mut params = CommandParams::new();
-                params.insert("txn", r#"{"reqId":1496822211362017764}"#.to_string());
+                params.insert("txn", TRANSACTION.to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
             tear_down_with_wallet_and_pool(&ctx);
@@ -3599,7 +3608,7 @@ pub mod tests {
             {
                 let cmd = sign_multi_command::new();
                 let mut params = CommandParams::new();
-                params.insert("txn", r#"{"reqId":1496822211362017764}"#.to_string());
+                params.insert("txn", TRANSACTION.to_string());
                 cmd.execute(&ctx, &params).unwrap_err();
             }
             tear_down_with_wallet_and_pool(&ctx);
@@ -3973,8 +3982,8 @@ pub mod tests {
     }
 
     fn create_new_did(ctx: &CommandContext) -> (String, String) {
-        let (wallet_handle, _) = get_opened_wallet(ctx).unwrap();
-        Did::new(wallet_handle, "{}").unwrap()
+        let (wallet, _) = get_opened_wallet(ctx).unwrap();
+        Did::new(&wallet, None, None, None, None).unwrap()
     }
 
     fn use_trustee(ctx: &CommandContext) {
@@ -3991,13 +4000,23 @@ pub mod tests {
     }
 
     pub fn send_schema(ctx: &CommandContext, did: &str) -> String {
-        let (pool_handle, _) = get_connected_pool(ctx).unwrap();
-        let (wallet_handle, _) = get_opened_wallet(ctx).unwrap();
-        let schema_data =
-            r#"{"id":"1", "name":"cli_gvt","version":"1.0","attrNames":["name"],"ver":"1.0"}"#;
-        let schema_request = Ledger::build_schema_request(&did, schema_data).unwrap();
+        let pool = get_connected_pool(ctx).unwrap();
+        let (wallet, _) = get_opened_wallet(ctx).unwrap();
+        let did = DidValue(did.to_string());
+        let name = "cli_gvt";
+        let version = "1.0";
+        let attr_names = ["name"];
+        let id = SchemaId::new(&did, name, version);
+        let schema = Schema::SchemaV1(SchemaV1 {
+            id,
+            name: name.to_string(),
+            version: version.to_string(),
+            attr_names: AttributeNames::from(attr_names.as_slice()),
+            seq_no: None,
+        });
+        let mut schema_request = Ledger::build_schema_request(Some(pool.deref()), &did, schema).unwrap();
         let schema_response =
-            Ledger::sign_and_submit_request(pool_handle, wallet_handle, &did, &schema_request)
+            Ledger::sign_and_submit_request(pool.deref(), &wallet, &did, &mut schema_request)
                 .unwrap();
         let schema: JsonValue = serde_json::from_str(&schema_response).unwrap();
         let seq_no = schema["result"]["txnMetadata"]["seqNo"].as_i64().unwrap();
@@ -4016,7 +4035,9 @@ pub mod tests {
     }
 
     fn _ensure_nym_added(ctx: &CommandContext, did: &str) -> Result<(), ()> {
-        let request = Ledger::build_get_nym_request(None, did).unwrap();
+        let pool = get_connected_pool(ctx).unwrap();
+        let did = DidValue(did.to_string());
+        let request = Ledger::build_get_nym_request(Some(&pool), None, &did).unwrap();
         submit_retry(ctx, &request, |response| {
             serde_json::from_str::<Response<ReplyResult<String>>>(&response).and_then(|response| {
                 serde_json::from_str::<JsonValue>(&response.result.unwrap().data)
@@ -4031,12 +4052,14 @@ pub mod tests {
         hash: Option<&str>,
         enc: Option<&str>,
     ) -> Result<(), ()> {
+        let pool = get_connected_pool(ctx).unwrap();
         let attr = if raw.is_some() {
             Some("endpoint")
         } else {
             None
         };
-        let request = Ledger::build_get_attrib_request(None, did, attr, hash, enc).unwrap();
+        let did = DidValue(did.to_string());
+        let request = Ledger::build_get_attrib_request(Some(&pool), None, &did, attr, hash, enc).unwrap();
         submit_retry(ctx, &request, |response| {
             serde_json::from_str::<Response<ReplyResult<String>>>(&response)
                 .map_err(|_| ())
@@ -4059,8 +4082,9 @@ pub mod tests {
     }
 
     fn _ensure_schema_added(ctx: &CommandContext, did: &str) -> Result<(), ()> {
-        let id = build_schema_id(did, "gvt", "1.0");
-        let request = Ledger::build_get_schema_request(None, &id).unwrap();
+        let pool = get_connected_pool(ctx).unwrap();
+        let id = SchemaId::new(&DidValue(did.to_string()), "gvt", "1.0");
+        let request = Ledger::build_get_schema_request(Some(&pool), None, &id).unwrap();
         submit_retry(ctx, &request, |response| {
             let schema: JsonValue = serde_json::from_str(&response).unwrap();
             schema["result"]["seqNo"].as_i64().ok_or(())
@@ -4068,8 +4092,10 @@ pub mod tests {
     }
 
     fn _ensure_cred_def_added(ctx: &CommandContext, did: &str, schema_id: &str) -> Result<(), ()> {
-        let id = build_cred_def_id(did, schema_id, "CL", "TAG");
-        let request = Ledger::build_get_cred_def_request(None, &id).unwrap();
+        let pool = get_connected_pool(&ctx).unwrap();
+        let schema_id = SchemaId::from_str(schema_id).unwrap();
+        let id = CredentialDefinitionId::new(&DidValue(did.to_string()), &schema_id, "CL", "TAG");
+        let request = Ledger::build_get_cred_def_request(Some(&pool), None, &id).unwrap();
         submit_retry(ctx, &request, |response| {
             let cred_def: JsonValue = serde_json::from_str(&response).unwrap();
             cred_def["result"]["seqNo"].as_i64().ok_or(())
