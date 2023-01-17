@@ -1,12 +1,14 @@
 use crate::{
     error::{CliError, CliResult},
     tools::did::Did,
+    utils::futures::block_on,
 };
 
-use aries_askar::{any::AnyStore, future::block_on};
+use aries_askar::any::AnyStore;
 use indy_utils::did::DidValue;
 use indy_vdr::{
     ledger::{
+        constants::*,
         identifiers::{CredentialDefinitionId, SchemaId},
         requests::{
             auth_rule::{AddAuthRuleData, AuthRuleData, AuthRules, Constraint, EditAuthRuleData},
@@ -460,20 +462,22 @@ impl Ledger {
     }
 
     pub fn build_ledgers_freeze_request(
-        _pool: Option<&LocalPool>,
-        _submitter_did: &DidValue,
-        _ledgers_ids: Vec<u64>,
+        pool: Option<&LocalPool>,
+        submitter_did: &DidValue,
+        ledgers_ids: Vec<u64>,
     ) -> CliResult<PreparedRequest> {
-        unimplemented!()
-        // ledger::build_ledgers_freeze_request(submitter_did, ledgers_ids).wait()
+        Self::_request_builder(pool)
+            .build_ledger_freeze_request(submitter_did, &ledgers_ids)
+            .map_err(CliError::from)
     }
 
     pub fn build_get_frozen_ledgers_request(
-        _pool: Option<&LocalPool>,
-        _submitter_did: &DidValue,
+        pool: Option<&LocalPool>,
+        submitter_did: &DidValue,
     ) -> CliResult<PreparedRequest> {
-        unimplemented!()
-        // ledger::build_get_frozen_ledgers_request(submitter_did).wait()
+        Self::_request_builder(pool)
+            .build_get_frozen_ledgers_request(submitter_did)
+            .map_err(CliError::from)
     }
 
     fn _request_builder(pool: Option<&LocalPool>) -> RequestBuilder {
@@ -496,5 +500,56 @@ impl Ledger {
     ) -> CliResult<Vec<u8>> {
         let sig_bytes = request.get_signature_input()?;
         Did::sign(store, &submitter_did.to_string(), sig_bytes.as_bytes()).await
+    }
+
+    pub fn get_role_title(role: &JsonValue) -> JsonValue {
+        JsonValue::String(
+            match role.as_str() {
+                Some(TRUSTEE) => "TRUSTEE",
+                Some(STEWARD) => "STEWARD",
+                Some(ENDORSER) => "ENDORSER",
+                Some(NETWORK_MONITOR) => "NETWORK_MONITOR",
+                _ => "-",
+            }
+            .to_string(),
+        )
+    }
+
+    pub fn get_txn_title(txn_type: &JsonValue) -> JsonValue {
+        JsonValue::String(
+            match txn_type.as_str() {
+                Some(NODE) => "NODE",
+                Some(NYM) => "NYM",
+                Some(GET_TXN) => "GET_TXN",
+                Some(TXN_AUTHR_AGRMT) => "TXN_AUTHR_AGRMT",
+                Some(TXN_AUTHR_AGRMT_AML) => "TXN_AUTHR_AGRMT_AML",
+                Some(GET_TXN_AUTHR_AGRMT) => "GET_TXN_AUTHR_AGRMT",
+                Some(GET_TXN_AUTHR_AGRMT_AML) => "GET_TXN_AUTHR_AGRMT_AML",
+                Some(LEDGERS_FREEZE) => "LEDGERS_FREEZE",
+                Some(GET_FROZEN_LEDGERS) => "GET_FROZEN_LEDGERS",
+                Some(ATTRIB) => "ATTRIB",
+                Some(SCHEMA) => "SCHEMA",
+                Some(GET_ATTR) => "GET_ATTR",
+                Some(GET_NYM) => "GET_NYM",
+                Some(GET_SCHEMA) => "GET_SCHEMA",
+                Some(GET_CRED_DEF) => "GET_CRED_DEF",
+                Some(CRED_DEF) => "CRED_DEF",
+                Some(POOL_UPGRADE) => "POOL_UPGRADE",
+                Some(POOL_CONFIG) => "POOL_CONFIG",
+                Some(REVOC_REG_DEF) => "REVOC_REG_DEF",
+                Some(REVOC_REG_ENTRY) => "REVOC_REG_ENTRY",
+                Some(GET_REVOC_REG_DEF) => "GET_REVOC_REG_DEF",
+                Some(GET_REVOC_REG) => "GET_REVOC_REG",
+                Some(GET_REVOC_REG_DELTA) => "GET_REVOC_REG_DELTA",
+                Some(POOL_RESTART) => "POOL_RESTART",
+                Some(GET_VALIDATOR_INFO) => "GET_VALIDATOR_INFO",
+                Some(AUTH_RULE) => "AUTH_RULE",
+                Some(GET_AUTH_RULE) => "GET_AUTH_RULE",
+                Some(AUTH_RULES) => "AUTH_RULES",
+                Some(val) => val,
+                _ => "-",
+            }
+            .to_string(),
+        )
     }
 }

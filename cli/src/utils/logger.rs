@@ -1,6 +1,3 @@
-extern crate log;
-extern crate log4rs;
-
 pub struct IndyCliLogger;
 
 impl IndyCliLogger {

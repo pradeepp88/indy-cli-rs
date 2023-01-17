@@ -1,10 +1,10 @@
-#[allow(dead_code)] // FIXME
 pub mod environment;
 #[macro_use]
 pub mod logger;
 #[macro_use]
 pub mod term;
 pub mod file;
+pub mod futures;
 pub mod history;
 pub mod pool_config;
 pub mod table;

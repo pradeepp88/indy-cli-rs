@@ -1,18 +1,11 @@
 #![cfg_attr(feature = "fatal_warnings", deny(warnings))]
 
-extern crate ansi_term;
-extern crate atty;
-extern crate linefeed;
-extern crate unescape;
 #[macro_use]
 extern crate log;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate log4rs;
-extern crate prettytable;
 
 #[macro_use]
 mod utils;
@@ -22,9 +15,8 @@ mod commands;
 mod error;
 mod tools;
 
-use crate::command_executor::CommandExecutor;
-
 use crate::{
+    command_executor::CommandExecutor,
     commands::{common, did, ledger, pool, wallet},
     utils::history,
 };

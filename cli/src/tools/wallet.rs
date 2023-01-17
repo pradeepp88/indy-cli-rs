@@ -2,15 +2,15 @@ use crate::{
     error::{CliError, CliResult},
     utils::{
         environment::EnvironmentUtils,
+        futures::block_on,
         wallet_config::{Config, WalletConfig},
     },
 };
 
 use aries_askar::{
-    any::AnyStore, future::block_on, Argon2Level, Error as AskarError, ErrorKind as AskarErrorKind,
-    KdfMethod, ManageBackend, PassKey, StoreKeyMethod,
+    any::AnyStore, Argon2Level, Error as AskarError, ErrorKind as AskarErrorKind, KdfMethod,
+    ManageBackend, PassKey, StoreKeyMethod,
 };
-
 use serde_json::Value as JsonValue;
 use std::fs;
 
@@ -56,7 +56,7 @@ impl Wallet {
 
         Self::create_wallet_directory(config)?;
 
-        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+        let wallet_uri = Self::build_wallet_uri(config, credentials, None)?;
         let credentials1 = Self::build_credentials(credentials)?;
 
         block_on(async move {
@@ -80,7 +80,7 @@ impl Wallet {
     }
 
     pub fn open(config: &Config, credentials: &Credentials) -> CliResult<AnyStore> {
-        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+        let wallet_uri = Self::build_wallet_uri(config, credentials, None)?;
         let credentials = Self::build_credentials(credentials)?;
 
         block_on(async move {
@@ -109,7 +109,7 @@ impl Wallet {
     }
 
     pub fn delete(config: &Config, credentials: &Credentials) -> CliResult<bool> {
-        let wallet_uri = Self::build_wallet_uri(config, credentials)?;
+        let wallet_uri = Self::build_wallet_uri(config, credentials, None)?;
 
         // Workaround to check that provided credentials are correct because Askar does not perform this check on delete call
         let store = Self::open(config, credentials)?;
@@ -133,8 +133,9 @@ impl Wallet {
     }
 
     pub fn export(_store: &AnyStore, _export_config: &ExportConfig) -> CliResult<()> {
-        unimplemented!()
-        // wallet::export_wallet(wallet_handle, export_config_json).wait()
+        Err(CliError::Unimplemented(
+            "Wallet exporting is not currently supported!".to_string(),
+        ))
     }
 
     pub fn import(
@@ -142,8 +143,9 @@ impl Wallet {
         _credentials: &Credentials,
         _import_config: &ImportConfig,
     ) -> CliResult<()> {
-        unimplemented!()
-        // wallet::import_wallet(config, credentials, import_config_json).wait()
+        Err(CliError::Unimplemented(
+            "Wallet importing is not currently supported!".to_string(),
+        ))
     }
 
     fn create_wallet_directory(config: &Config) -> CliResult<()> {
@@ -162,15 +164,23 @@ impl Wallet {
         fs::remove_dir_all(path.as_path()).map_err(CliError::from)
     }
 
-    fn build_wallet_uri(config: &Config, credentials: &Credentials) -> CliResult<String> {
+    fn build_wallet_uri(
+        config: &Config,
+        credentials: &Credentials,
+        path: Option<&str>,
+    ) -> CliResult<String> {
         let storage_type = Self::map_storage_type(&config.storage_type)?;
         match storage_type {
-            StorageType::Sqlite => Self::build_sqlite_uri(config, credentials),
+            StorageType::Sqlite => Self::build_sqlite_uri(config, credentials, path),
             StorageType::Postgres => Self::build_postgres_uri(config, credentials),
         }
     }
 
-    fn build_sqlite_uri(config: &Config, _credentials: &Credentials) -> CliResult<String> {
+    fn build_sqlite_uri(
+        config: &Config,
+        _credentials: &Credentials,
+        _path: Option<&str>,
+    ) -> CliResult<String> {
         let mut path = EnvironmentUtils::wallet_path(&config.id);
         path.push(&config.id);
         path.set_extension("db");

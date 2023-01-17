@@ -1,6 +1,3 @@
-extern crate chrono;
-extern crate serde_json;
-
 use crate::{
     command_executor::{
         wait_for_user_reply, Command, CommandContext, CommandGroup, CommandGroupMetadata,
@@ -11,7 +8,7 @@ use crate::{
     utils::table::print_list_table,
 };
 
-use self::chrono::prelude::*;
+use chrono::prelude::*;
 use indy_vdr::{config::PoolConfig, pool::ProtocolVersion};
 
 pub mod group {
@@ -118,7 +115,7 @@ pub mod connect_command {
         //     JSONValue::from(json).to_string()
         // };
 
-        let protocol_version = ProtocolVersion::from_id(protocol_version as u64).map_err(|_| {
+        let protocol_version = ProtocolVersion::from_id(protocol_version as i64).map_err(|_| {
             println_err!("Unexpected Pool protocol version \"{}\".", protocol_version)
         })?;
 
@@ -142,7 +139,7 @@ pub mod connect_command {
         set_connected_pool(ctx, Some((pool, name.to_owned())));
         println_succ!("Pool \"{}\" has been connected", name);
 
-        let (pool, _) = ensure_connected_pool(ctx)?;
+        let pool = ensure_connected_pool(ctx)?;
         set_transaction_author_agreement(ctx, &pool, true)?;
 
         trace!("execute <<");
@@ -223,7 +220,8 @@ pub mod refresh_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (pool, pool_name) = ensure_connected_pool(&ctx)?;
+        let pool = ensure_connected_pool(&ctx)?;
+        let pool_name = ensure_connected_pool_name(&ctx)?;
 
         Pool::refresh(&pool_name, &pool)
             .map_err(|err| println_err!("Unable to refresh pool. Reason: {}", err.message(None)))?;
@@ -269,7 +267,8 @@ pub mod disconnect_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (pool, name) = ensure_connected_pool(ctx)?;
+        let pool = ensure_connected_pool(&ctx)?;
+        let name = ensure_connected_pool_name(&ctx)?;
 
         close_pool(ctx, &pool, &name)?;
 

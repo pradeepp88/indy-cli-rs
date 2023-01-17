@@ -362,7 +362,8 @@ pub mod export_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let (store, wallet_name) = ensure_opened_wallet(&ctx)?;
+        let wallet = ensure_opened_wallet(&ctx)?;
+        let wallet_name = ensure_opened_wallet_name(&ctx)?;
 
         let export_path = get_str_param("export_path", params).map_err(error_err!())?;
         let export_key = get_str_param("export_key", params).map_err(error_err!())?;
@@ -381,7 +382,7 @@ pub mod export_command {
             export_path
         );
 
-        Wallet::export(&store, &export_config)
+        Wallet::export(&wallet, &export_config)
             .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
 
         println_succ!(
@@ -752,7 +753,7 @@ pub mod tests {
                 params.insert("key_derivation_method", "raw".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            ensure_opened_store(&ctx).unwrap();
+            ensure_opened_wallet(&ctx).unwrap();
             close_and_delete_wallet(&ctx);
 
             tear_down();
@@ -852,7 +853,7 @@ pub mod tests {
                 let params = CommandParams::new();
                 cmd.execute(&ctx, &params).unwrap();
             }
-            ensure_opened_store(&ctx).unwrap_err();
+            ensure_opened_wallet(&ctx).unwrap_err();
             delete_wallet(&ctx);
             tear_down();
         }
@@ -1338,7 +1339,7 @@ pub mod tests {
             cmd.execute(&ctx, &params).unwrap();
         }
 
-        ensure_opened_store(&ctx).unwrap()
+        ensure_opened_wallet(&ctx).unwrap()
     }
 
     pub fn open_wallet(ctx: &CommandContext) -> Rc<AnyStore> {
@@ -1351,7 +1352,7 @@ pub mod tests {
             cmd.execute(&ctx, &params).unwrap();
         }
 
-        ensure_opened_store(&ctx).unwrap()
+        ensure_opened_wallet(&ctx).unwrap()
     }
 
     pub fn close_and_delete_wallet(ctx: &CommandContext) {

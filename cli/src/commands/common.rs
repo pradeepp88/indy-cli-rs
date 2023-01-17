@@ -1,9 +1,8 @@
 use crate::{
     command_executor::{Command, CommandContext, CommandMetadata, CommandParams, CommandResult},
     commands::get_str_param,
+    utils::{file::read_file, logger},
 };
-
-use crate::utils::{file::read_file, logger};
 
 pub mod about_command {
     use super::*;

@@ -4,7 +4,7 @@ use atty;
 macro_rules! println_err {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
-            println!("{}", $crate::ansi_term::Color::Red.bold().paint(format!($($arg)*)))
+            println!("{}", ansi_term::Color::Red.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
         }
@@ -15,7 +15,7 @@ macro_rules! println_err {
 macro_rules! println_succ {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
-            println!("{}", $crate::ansi_term::Color::Green.bold().paint(format!($($arg)*)))
+            println!("{}", ansi_term::Color::Green.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
         }
@@ -26,7 +26,7 @@ macro_rules! println_succ {
 macro_rules! println_warn {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
-            println!("{}", $crate::ansi_term::Color::Yellow.bold().paint(format!($($arg)*)))
+            println!("{}", ansi_term::Color::Yellow.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
         }
@@ -37,7 +37,7 @@ macro_rules! println_warn {
 macro_rules! println_acc {
     ($($arg:tt)*) => (
        if $crate::utils::term::is_term() {
-           println!("{}", $crate::ansi_term::Style::new().bold().paint(format!($($arg)*)))
+           println!("{}", ansi_term::Style::new().bold().paint(format!($($arg)*)))
        } else {
            println!($($arg)*)
        }

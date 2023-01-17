@@ -41,7 +41,7 @@ pub mod new_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let store = ensure_opened_store(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
 
         let did = get_opt_str_param("did", params).map_err(error_err!())?;
         let seed = get_opt_str_param("seed", params).map_err(error_err!())?;
@@ -100,7 +100,7 @@ pub mod import_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ensure_opened_store(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
 
         let path = get_str_param("file", params).map_err(error_err!())?;
 
@@ -155,7 +155,7 @@ pub mod use_command {
 
         let did = get_did_param("did", params).map_err(error_err!())?;
 
-        let store = ensure_opened_store(ctx)?;
+        let store = ensure_opened_wallet(ctx)?;
 
         Did::get_did_with_meta(&store, &did)
             .map_err(|err| println_err!("{}", err.message(None)))?;
@@ -195,7 +195,7 @@ pub mod rotate_key_command {
 
         let did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool_with_name(&ctx);
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
 
         // get verkey from ledger
         let ledger_verkey = match pool {
@@ -260,7 +260,8 @@ pub mod rotate_key_command {
         };
 
         if update_ledger && is_did_on_the_ledger {
-            let (pool, pool_name) = ensure_connected_pool(&ctx)?;
+            let pool = ensure_connected_pool(&ctx)?;
+            let pool_name = ensure_connected_pool_name(&ctx)?;
             let mut request =
                 Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None)
                     .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?;
@@ -334,7 +335,7 @@ pub mod list_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ensure_opened_store(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
 
         let mut dids = Did::list_dids_with_meta(&store)
             .map_err(|err| println_err!("{}", err.message(None)))?;
@@ -384,7 +385,7 @@ pub mod qualify_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?}, params {:?}", ctx, params);
 
-        let (wallet, _) = ensure_opened_wallet(ctx)?;
+        let wallet = ensure_opened_wallet(ctx)?;
         let did = get_did_param("did", params).map_err(error_err!())?;
         let method = get_str_param("method", params).map_err(error_err!())?;
 
@@ -679,7 +680,7 @@ pub mod tests {
 
         fn ensure_nym_written(ctx: &CommandContext, did: &str, verkey: &str) {
             let pool = get_connected_pool(&ctx).unwrap();
-            let wallet = ensure_opened_store(ctx).unwrap();
+            let wallet = ensure_opened_wallet(ctx).unwrap();
             let did = DidValue(did.to_string());
             let mut request = Ledger::build_get_nym_request(Some(&pool), None, &did).unwrap();
             Ledger::sign_request(&wallet, &did, &mut request).unwrap();
@@ -707,7 +708,7 @@ pub mod tests {
 
             new_did(&ctx, SEED_TRUSTEE);
 
-            let wallet = ensure_opened_store(&ctx).unwrap();
+            let wallet = ensure_opened_wallet(&ctx).unwrap();
             let (did, verkey) = Did::new(&wallet, None, None, None, None).unwrap();
             use_did(&ctx, DID_TRUSTEE);
             send_nym(&ctx, &did, &verkey, None);
@@ -896,13 +897,13 @@ pub mod tests {
     }
 
     fn get_did_info(ctx: &CommandContext, did: &str) -> DidInfo {
-        let wallet = ensure_opened_store(ctx).unwrap();
+        let wallet = ensure_opened_wallet(ctx).unwrap();
         let did = DidValue(did.to_string());
         Did::get_did_with_meta(&wallet, &did).unwrap()
     }
 
     fn get_dids(ctx: &CommandContext) -> Vec<DidInfo> {
-        let wallet = ensure_opened_store(ctx).unwrap();
+        let wallet = ensure_opened_wallet(ctx).unwrap();
         Did::list_dids_with_meta(&wallet).unwrap()
     }
 

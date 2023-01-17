@@ -1,26 +1,21 @@
-extern crate chrono;
-
 use crate::{
     command_executor::{
         Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
     },
     commands::*,
-    tools::ledger::Ledger,
-};
-
-use crate::{
     error::CliResult,
+    tools::{did::Did, ledger::Ledger},
     utils::{
         file::{read_file, write_file},
         table::{print_list_table, print_table},
     },
 };
 
-use self::chrono::prelude::*;
-
+use chrono::prelude::*;
 use indy_utils::did::DidValue;
 use indy_vdr::{
     ledger::{
+        constants::txn_name_to_code,
         identifiers::{CredentialDefinitionId, SchemaId},
         requests::{
             cred_def::{
@@ -97,7 +92,7 @@ macro_rules! send_read_request {
 macro_rules! send_request {
     ($ctx:expr, $params:expr, $request:expr, $wallet_name:expr, $submitter_did:expr, $send:expr) => {{
         if $send {
-            let (pool, _) = ensure_connected_pool($ctx)?;
+            let pool = ensure_connected_pool($ctx)?;
             let response_json = Ledger::submit_request(&pool, $request).map_err(|err| {
                 println_err!("{}", err.message(None));
             })?;
@@ -110,7 +105,7 @@ macro_rules! send_request {
             let request_json = json!(&$request.req_json).to_string();
             println_succ!("Transaction has been created:");
             println!("     {:?}", request_json);
-            set_transaction($ctx, Some(request_json));
+            set_context_transaction($ctx, Some(request_json));
             return Ok(());
         }
     }};
@@ -121,7 +116,7 @@ macro_rules! get_transaction_to_use {
         if let Some(txn_) = $param_txn {
             PreparedRequest::from_request_json(&txn_)
                 .map_err(|_| println_err!("Invalid formatted transaction provided."))?
-        } else if let Some(txn_) = get_transaction($ctx) {
+        } else if let Some(txn_) = get_context_transaction($ctx) {
             println!("Transaction stored into context: {:?}.", txn_);
             println!("Would you like to use it? (y/n)");
 
@@ -146,7 +141,6 @@ macro_rules! get_transaction_to_use {
 
 pub mod nym_command {
     use super::*;
-    use crate::tools::did::Did;
 
     command!(CommandMetadata::build("nym", r#"Send NYM transaction to the Ledger."#)
                 .add_required_param("did", "DID of new identity")
@@ -168,7 +162,7 @@ pub mod nym_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let pool = get_connected_pool(&ctx);
         let submitter_did = ensure_active_did(&ctx)?;
 
@@ -221,8 +215,8 @@ pub mod nym_command {
         );
 
         if let Some(result) = response.result.as_mut() {
-            result["txn"]["data"]["role"] = get_role_title(&result["txn"]["data"]["role"]);
-            result["role"] = get_role_title(&result["role"]);
+            result["txn"]["data"]["role"] = Ledger::get_role_title(&result["txn"]["data"]["role"]);
+            result["role"] = Ledger::get_role_title(&result["role"]);
         }
 
         handle_transaction_response(response).map(|result| {
@@ -268,7 +262,7 @@ pub mod get_nym_command {
             let data = serde_json::from_str::<JsonValue>(&result["data"].as_str().unwrap_or(""));
             match data {
                 Ok(mut data) => {
-                    data["role"] = get_role_title(&data["role"]);
+                    data["role"] = Ledger::get_role_title(&data["role"]);
                     result["data"] = data;
                 }
                 Err(_) => {
@@ -321,7 +315,7 @@ pub mod attrib_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let pool = get_connected_pool(&ctx);
         let submitter_did = ensure_active_did(&ctx)?;
 
@@ -462,7 +456,7 @@ pub mod schema_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -586,7 +580,7 @@ pub mod get_validator_info_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ensure_connected_pool_handle(&ctx)?;
-        let store = ensure_opened_store(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
 
         let nodes = get_opt_str_array_param("nodes", params).map_err(error_err!())?;
@@ -667,7 +661,7 @@ pub mod cred_def_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -808,7 +802,7 @@ pub mod node_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -903,7 +897,7 @@ pub mod pool_config_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -958,8 +952,9 @@ pub mod pool_restart_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (pool, pool_name) = ensure_connected_pool(&ctx)?;
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let pool = ensure_connected_pool(&ctx)?;
+        let pool_name = ensure_connected_pool_name(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
 
         let action = get_str_param("action", params).map_err(error_err!())?;
@@ -1046,7 +1041,7 @@ pub mod pool_upgrade_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1156,7 +1151,8 @@ pub mod custom_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (pool, pool_name) = ensure_connected_pool(&ctx)?;
+        let pool = ensure_connected_pool(&ctx)?;
+        let pool_name = ensure_connected_pool_name(&ctx)?;
 
         let txn = get_str_param("txn", params).map_err(error_err!())?;
         let sign = get_opt_bool_param("sign", params)
@@ -1166,7 +1162,7 @@ pub mod custom_command {
         let mut transaction = txn.to_string();
 
         if txn == "context" {
-            let context_txn = get_transaction(ctx);
+            let context_txn = get_context_transaction(ctx);
 
             match context_txn {
                 Some(txn_) => {
@@ -1195,7 +1191,7 @@ pub mod custom_command {
             .map_err(|_| println_err!("Invalid formatted transaction provided."))?;
 
         let response_json = if sign {
-            let (store, _) = ensure_opened_wallet(&ctx)?;
+            let store = ensure_opened_wallet(&ctx)?;
             let submitter_did = ensure_active_did(&ctx)?;
             Ledger::sign_and_submit_request(&pool, &store, &submitter_did, &mut transaction)
                 .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?
@@ -1255,7 +1251,7 @@ pub mod sign_multi_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
 
         let param_txn = get_opt_str_param("txn", params).map_err(error_err!())?;
@@ -1266,7 +1262,7 @@ pub mod sign_multi_command {
             Ok(_) => {
                 println_succ!("Transaction has been signed:");
                 println_succ!("{:?}", txn.req_json.to_string());
-                set_transaction(ctx, Some(txn.req_json.to_string()));
+                set_context_transaction(ctx, Some(txn.req_json.to_string()));
             }
             Err(err) => match err {
                 CliError::VdrError(ref vdr_err) => match vdr_err.kind() {
@@ -1290,7 +1286,6 @@ pub mod sign_multi_command {
 
 pub mod auth_rule_command {
     use super::*;
-    use indy_vdr::ledger::constants::txn_name_to_code;
 
     command!(CommandMetadata::build("auth-rule", "Send AUTH_RULE request to change authentication rules for a ledger transaction.")
                 .add_required_param("txn_type", "Ledger transaction alias or associated value")
@@ -1325,7 +1320,7 @@ pub mod auth_rule_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1361,9 +1356,10 @@ pub mod auth_rule_command {
         );
 
         if let Some(result) = response.result.as_mut() {
-            result["txn"]["data"]["auth_type"] = get_txn_title(&result["txn"]["data"]["auth_type"]);
+            result["txn"]["data"]["auth_type"] =
+                Ledger::get_txn_title(&result["txn"]["data"]["auth_type"]);
             result["txn"]["data"]["constraint"] = JsonValue::String(
-                ::serde_json::to_string_pretty(&result["txn"]["data"]["constraint"]).unwrap(),
+                serde_json::to_string_pretty(&result["txn"]["data"]["constraint"]).unwrap(),
             );
         }
 
@@ -1403,7 +1399,7 @@ pub mod auth_rules_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1505,7 +1501,7 @@ pub mod save_transaction_command {
 
         let file = get_str_param("file", params).map_err(error_err!())?;
 
-        let transaction = ensure_set_transaction(ctx)?;
+        let transaction = ensure_context_transaction(ctx)?;
 
         println!("Transaction: {:?}.", transaction);
         println!("Would you like to save it? (y/n)");
@@ -1558,7 +1554,7 @@ pub mod load_transaction_command {
 
         println!("Transaction has been loaded: {}", transaction);
 
-        set_transaction(ctx, Some(transaction));
+        set_context_transaction(ctx, Some(transaction));
 
         trace!("execute <<");
         Ok(())
@@ -1604,7 +1600,7 @@ pub mod taa_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1689,7 +1685,7 @@ pub mod aml_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1762,7 +1758,7 @@ pub mod taa_disable_all_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
@@ -1809,29 +1805,29 @@ pub mod endorse_transaction_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let (store, wallet_name) = ensure_opened_wallet(&ctx)?;
+        let wallet = ensure_opened_wallet(&ctx)?;
+        let wallet_name = ensure_opened_wallet_name(&ctx)?;
         let submitter_did = ensure_active_did(&ctx)?;
 
         let param_txn = get_opt_str_param("txn", params).map_err(error_err!())?;
 
         let mut request = get_transaction_to_use!(ctx, param_txn);
 
-        Ledger::multi_sign_request(&store, &submitter_did, &mut request)
+        Ledger::multi_sign_request(&wallet, &submitter_did, &mut request)
             .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
 
         let (_, response) = send_request!(&ctx, params, &request, None, Some(&submitter_did), true);
 
-        handle_transaction_response(response)
-            .and_then(|result| parse_transaction_response(result))
-            .map(|(metadata_headers, metadata, data)| {
-                println_succ!("Transaction has been sent to Ledger.");
+        let (metadata_headers, metadata, data) = handle_transaction_response(response)
+            .and_then(|result| parse_transaction_response(result))?;
 
-                println_succ!("Metadata:");
-                print_table(&metadata, &metadata_headers);
+        println_succ!("Transaction has been sent to Ledger.");
 
-                println_succ!("Data:");
-                print_table(&json!({ "data": data }), &[("data", "Data")]);
-            })?;
+        println_succ!("Metadata:");
+        print_table(&metadata, &metadata_headers);
+
+        println_succ!("Data:");
+        print_table(&json!({ "data": data }), &[("data", "Data")]);
 
         trace!("execute <<");
         Ok(())
@@ -1931,7 +1927,7 @@ pub mod ledgers_freeze_command {
         let submitter_did = ensure_active_did(&ctx)?;
         let pool = get_connected_pool(&ctx);
 
-        let (store, _) = ensure_opened_wallet(&ctx)?;
+        let store = ensure_opened_wallet(&ctx)?;
 
         let mut request =
             Ledger::build_ledgers_freeze_request(pool.as_deref(), &submitter_did, ledgers_ids?)
@@ -2034,7 +2030,7 @@ fn print_auth_rules(rules: AuthRulesData) {
     let constraints = rules
         .into_iter()
         .map(|rule| {
-            let auth_type = get_txn_title(&JsonValue::String(rule.auth_type.clone()));
+            let auth_type = Ledger::get_txn_title(&JsonValue::String(rule.auth_type.clone()));
             let action = rule.auth_action;
             let field = rule.field;
             let old_value = if action == "ADD" {
@@ -2244,57 +2240,6 @@ pub fn handle_transaction_response(response: Response<JsonValue>) -> Result<Json
             Err(())
         }
     }
-}
-
-fn get_role_title(role: &JsonValue) -> JsonValue {
-    JsonValue::String(
-        match role.as_str() {
-            Some("0") => "TRUSTEE",
-            Some("2") => "STEWARD",
-            Some("101") => "ENDORSER",
-            Some("201") => "NETWORK_MONITOR",
-            _ => "-",
-        }
-        .to_string(),
-    )
-}
-
-fn get_txn_title(role: &JsonValue) -> JsonValue {
-    JsonValue::String(
-        match role.as_str() {
-            Some("0") => "NODE",
-            Some("1") => "NYM",
-            Some("3") => "GET_TXN",
-            Some("4") => "TXN_AUTHR_AGRMT",
-            Some("5") => "TXN_AUTHR_AGRMT_AML",
-            Some("6") => "GET_TXN_AUTHR_AGRMT",
-            Some("7") => "GET_TXN_AUTHR_AGRMT_AML",
-            Some("9") => "LEDGERS_FREEZE",
-            Some("10") => "GET_FROZEN_LEDGERS",
-            Some("100") => "ATTRIB",
-            Some("101") => "SCHEMA",
-            Some("104") => "GET_ATTR",
-            Some("105") => "GET_NYM",
-            Some("107") => "GET_SCHEMA",
-            Some("108") => "GET_CRED_DEF",
-            Some("102") => "CRED_DEF",
-            Some("109") => "POOL_UPGRADE",
-            Some("111") => "POOL_CONFIG",
-            Some("113") => "REVOC_REG_DEF",
-            Some("114") => "REVOC_REG_ENTRY",
-            Some("115") => "GET_REVOC_REG_DEF",
-            Some("116") => "GET_REVOC_REG",
-            Some("117") => "GET_REVOC_REG_DELTA",
-            Some("118") => "POOL_RESTART",
-            Some("119") => "GET_VALIDATOR_INFO",
-            Some("120") => "AUTH_RULE",
-            Some("121") => "GET_AUTH_RULE",
-            Some("122") => "AUTH_RULES",
-            Some(val) => val,
-            _ => "-",
-        }
-        .to_string(),
-    )
 }
 
 fn timestamp_to_datetime(_time: i64) -> String {
@@ -2509,7 +2454,7 @@ pub mod tests {
                 cmd.execute(&ctx, &params).unwrap();
             }
             assert!(_ensure_nym_added(&ctx, &did).is_err());
-            assert!(get_transaction(&ctx).is_some());
+            assert!(get_context_transaction(&ctx).is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
 
@@ -2527,7 +2472,7 @@ pub mod tests {
                 params.insert("send", "false".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            let transaction = get_transaction(&ctx).unwrap();
+            let transaction = get_context_transaction(&ctx).unwrap();
             let transaction: JsonValue = serde_json::from_str(&transaction).unwrap();
             assert!(transaction["signature"].is_null());
             tear_down_with_wallet_and_pool(&ctx);
@@ -2726,7 +2671,7 @@ pub mod tests {
                 cmd.execute(&ctx, &params).unwrap();
             }
             assert!(_ensure_attrib_added(&ctx, &did, Some(ATTRIB_RAW_DATA), None, None).is_err());
-            assert!(get_transaction(&ctx).is_some());
+            assert!(get_context_transaction(&ctx).is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
 
@@ -2743,7 +2688,7 @@ pub mod tests {
                 params.insert("send", "false".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            let transaction = get_transaction(&ctx).unwrap();
+            let transaction = get_context_transaction(&ctx).unwrap();
             let transaction: JsonValue = serde_json::from_str(&transaction).unwrap();
             assert!(transaction["signature"].is_null());
             tear_down_with_wallet_and_pool(&ctx);
@@ -2951,7 +2896,7 @@ pub mod tests {
                 cmd.execute(&ctx, &params).unwrap();
             }
             assert!(_ensure_schema_added(&ctx, &did).is_err());
-            assert!(get_transaction(&ctx).is_some());
+            assert!(get_context_transaction(&ctx).is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
 
@@ -2969,7 +2914,7 @@ pub mod tests {
                 params.insert("send", "false".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            let transaction = get_transaction(&ctx).unwrap();
+            let transaction = get_context_transaction(&ctx).unwrap();
             let transaction: JsonValue = serde_json::from_str(&transaction).unwrap();
             assert!(transaction["signature"].is_null());
             tear_down_with_wallet_and_pool(&ctx);
@@ -3231,7 +3176,7 @@ pub mod tests {
                 cmd.execute(&ctx, &params).unwrap();
             }
             assert!(_ensure_cred_def_added(&ctx, &did, &schema_id).is_err());
-            assert!(get_transaction(&ctx).is_some());
+            assert!(get_context_transaction(&ctx).is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
     }
@@ -3758,7 +3703,7 @@ pub mod tests {
                 params.insert("send", "false".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            assert!(get_transaction(&ctx).is_some());
+            assert!(get_context_transaction(&ctx).is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
     }
@@ -3799,7 +3744,7 @@ pub mod tests {
                 cmd.execute(&ctx, &params).unwrap();
             }
 
-            let context_txn = get_transaction(&ctx).unwrap();
+            let context_txn = get_context_transaction(&ctx).unwrap();
 
             assert_eq!(TRANSACTION.to_string(), context_txn);
 
@@ -3847,7 +3792,7 @@ pub mod tests {
             // Write long
             let (_, path_str) = _path();
             {
-                set_transaction(&ctx, Some(long_request));
+                set_context_transaction(&ctx, Some(long_request));
 
                 let cmd = save_transaction_command::new();
                 let mut params = CommandParams::new();
@@ -3858,7 +3803,7 @@ pub mod tests {
             // Write short
             let (_, path_str) = _path();
             {
-                set_transaction(&ctx, Some(short_request));
+                set_context_transaction(&ctx, Some(short_request));
 
                 let cmd = save_transaction_command::new();
                 let mut params = CommandParams::new();

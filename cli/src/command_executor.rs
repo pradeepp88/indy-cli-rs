@@ -1,6 +1,3 @@
-extern crate log4rs;
-extern crate rpassword;
-
 use unescape::unescape;
 
 use aries_askar::any::AnyStore;

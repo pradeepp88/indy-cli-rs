@@ -1,9 +1,11 @@
 use crate::{
     error::{CliError, CliResult},
-    utils::pool_config::{Config, PoolConfig},
+    utils::{
+        futures::block_on,
+        pool_config::{Config, PoolConfig},
+    },
 };
 
-use aries_askar::future::block_on;
 use indy_vdr::{
     config::PoolConfig as OpenPoolConfig,
     pool::{helpers::perform_refresh, LocalPool, Pool as PoolImpl, PoolBuilder, PoolTransactions},

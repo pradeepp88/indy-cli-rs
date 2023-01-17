@@ -13,6 +13,8 @@ pub enum CliError {
     NotFound(String),
     #[error("`{0}`")]
     InvalidEntityState(String),
+    #[error("`{0}`")]
+    Unimplemented(String),
     #[error("Invalid input parameter provided `{0}`")]
     InvalidInput(String),
     #[error("Aries Askar error occurred `{0}`")]
@@ -67,7 +69,8 @@ impl CliError {
             CliError::InvalidInput(message)
             | CliError::InvalidEntityState(message)
             | CliError::NotFound(message)
-            | CliError::Duplicate(message) => message.to_string(),
+            | CliError::Duplicate(message)
+            | CliError::Unimplemented(message) => message.to_string(),
             CliError::VdrError(vdr_error) => match vdr_error.kind() {
                 VdrErrorKind::Config => "Pool configuration is invalid.".to_string(),
                 VdrErrorKind::Connection => format!(
@@ -130,16 +133,4 @@ impl CliError {
             CliError::FileSystemError(fs_error) => fs_error.to_string(),
         }
     }
-    // match err.error_code {
-    //     ErrorCode::WalletAlreadyExistsError => println_err!("Wallet \"{}\" already exists", wallet_name.unwrap_or("")),
-    //     ErrorCode::WalletInvalidHandle => println_err!("Wallet: \"{}\" not found", wallet_name.unwrap_or("")),
-    //     ErrorCode::WalletItemNotFound => println_err!("Submitter DID: \"{}\" not found", submitter_did.unwrap_or("")),
-    //     ErrorCode::WalletIncompatiblePoolError =>
-    //         println_err!("Wallet \"{}\" is incompatible with pool \"{}\".", wallet_name.unwrap_or(""), pool_name.unwrap_or("")),
-    //     ErrorCode::PoolLedgerNotCreatedError => println_err!("Pool \"{}\" does not exist.", pool_name.unwrap_or("")),
-    //     ErrorCode::PoolLedgerTerminated => println_err!("Pool \"{}\" does not exist.", pool_name.unwrap_or("")),
-    //     ErrorCode::PoolLedgerTimeout => println_err!("Transaction response has not been received"),
-    //     ErrorCode::DidAlreadyExistsError => println_err!("Did already exists"),
-    //     _ => println_err!("{}", err.message),
-    // }
 }

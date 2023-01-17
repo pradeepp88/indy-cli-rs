@@ -1,8 +1,10 @@
-use crate::error::{CliError, CliResult};
+use crate::{
+    error::{CliError, CliResult},
+    utils::futures::block_on,
+};
 
 use aries_askar::{
     any::AnyStore,
-    future::block_on,
     kms::{KeyAlg, LocalKey},
     Entry, EntryTag,
 };
