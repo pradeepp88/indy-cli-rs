@@ -6,15 +6,15 @@ pub mod ledger;
 pub mod pool;
 pub mod wallet;
 
-use crate::command_executor::{CommandContext, CommandParams};
+use crate::{
+    command_executor::{CommandContext, CommandParams},
+    error::CliError,
+};
 
-use crate::error::CliError;
 use aries_askar::any::AnyStore;
-use indy_utils::did::DidValue;
-use indy_utils::Qualifiable;
+use indy_utils::{did::DidValue, Qualifiable};
 use indy_vdr::pool::LocalPool;
-use std;
-use std::rc::Rc;
+use std::{self, rc::Rc};
 
 pub fn get_str_param<'a>(name: &'a str, params: &'a CommandParams) -> Result<&'a str, ()> {
     match params.get(name) {

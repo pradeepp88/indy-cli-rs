@@ -1,7 +1,10 @@
 use crate::utils::environment::EnvironmentUtils;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::{fs, io};
+use std::{
+    fs,
+    fs::File,
+    io,
+    io::{Read, Write},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {

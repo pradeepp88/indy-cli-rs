@@ -1,17 +1,14 @@
-use crate::error::{CliError, CliResult};
-use crate::utils::environment::EnvironmentUtils;
-use crate::utils::wallet_config::{Config, WalletConfig};
+use crate::{
+    error::{CliError, CliResult},
+    utils::{
+        environment::EnvironmentUtils,
+        wallet_config::{Config, WalletConfig},
+    },
+};
 
 use aries_askar::{
-    Error as AskarError,
-    ErrorKind as AskarErrorKind,
-    any::AnyStore,
-    future::block_on,
-    ManageBackend,
-    PassKey,
-    StoreKeyMethod,
-    Argon2Level,
-    KdfMethod,
+    any::AnyStore, future::block_on, Argon2Level, Error as AskarError, ErrorKind as AskarErrorKind,
+    KdfMethod, ManageBackend, PassKey, StoreKeyMethod,
 };
 
 use serde_json::Value as JsonValue;
@@ -51,7 +48,10 @@ struct AskarCredentials<'a> {
 impl Wallet {
     pub fn create(config: &Config, credentials: &Credentials) -> CliResult<AnyStore> {
         if WalletConfig::exists(&config.id) {
-            return Err(CliError::Duplicate(format!("Wallet \"{}\" already exists", config.id)));
+            return Err(CliError::Duplicate(format!(
+                "Wallet \"{}\" already exists",
+                config.id
+            )));
         }
 
         Self::create_wallet_directory(config)?;
@@ -87,11 +87,12 @@ impl Wallet {
             let mut store: AnyStore = wallet_uri
                 .open_backend(Some(credentials.key_method), credentials.key.as_ref(), None)
                 .await
-                .map_err(|err: AskarError| {
-                    match err.kind() {
-                        AskarErrorKind::NotFound => CliError::NotFound(format!("Wallet \"{}\" not found or unavailable.", config.id)),
-                        _ => CliError::from(err)
-                    }
+                .map_err(|err: AskarError| match err.kind() {
+                    AskarErrorKind::NotFound => CliError::NotFound(format!(
+                        "Wallet \"{}\" not found or unavailable.",
+                        config.id
+                    )),
+                    _ => CliError::from(err),
                 })?;
 
             if let (Some(rekey), Some(rekey_method)) = (credentials.rekey, credentials.rekey_method)

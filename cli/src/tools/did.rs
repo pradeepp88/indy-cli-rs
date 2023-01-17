@@ -1,7 +1,7 @@
 use crate::error::{CliError, CliResult};
 
-use aries_askar::any::AnyStore;
 use aries_askar::{
+    any::AnyStore,
     future::block_on,
     kms::{KeyAlg, LocalKey},
     Entry, EntryTag,
@@ -295,18 +295,22 @@ impl Did {
             if decoded.len() == SEED_BYTES {
                 Ok(decoded)
             } else {
-                Err(CliError::InvalidInput(
-                    format!("Provided invalid base64 encoded `seed`. \
-                                   The number of bytes must be {} ", SEED_BYTES)))
+                Err(CliError::InvalidInput(format!(
+                    "Provided invalid base64 encoded `seed`. \
+                                   The number of bytes must be {} ",
+                    SEED_BYTES
+                )))
             }
         } else if seed.as_bytes().len() == SEED_BYTES * 2 {
             // is hex string
-            Vec::from_hex(seed)
-                .map_err(|_| CliError::InvalidInput(format!("Seed is invalid hex")))
+            Vec::from_hex(seed).map_err(|_| CliError::InvalidInput(format!("Seed is invalid hex")))
         } else {
-            Err(CliError::InvalidInput(
-                format!("Provided invalid `seed`. It can be either \
-                               {} bytes string or base64 string or {} bytes HEX string", SEED_BYTES, SEED_BYTES * 2)))
+            Err(CliError::InvalidInput(format!(
+                "Provided invalid `seed`. It can be either \
+                               {} bytes string or base64 string or {} bytes HEX string",
+                SEED_BYTES,
+                SEED_BYTES * 2
+            )))
         }
     }
 }

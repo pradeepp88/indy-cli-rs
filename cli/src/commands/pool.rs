@@ -1,17 +1,18 @@
 extern crate chrono;
 extern crate serde_json;
 
-use crate::command_executor::{
-    wait_for_user_reply, Command, CommandContext, CommandGroup, CommandGroupMetadata,
-    CommandMetadata, CommandParams, DynamicCompletionType,
+use crate::{
+    command_executor::{
+        wait_for_user_reply, Command, CommandContext, CommandGroup, CommandGroupMetadata,
+        CommandMetadata, CommandParams, DynamicCompletionType,
+    },
+    commands::*,
+    tools::pool::Pool,
+    utils::table::print_list_table,
 };
-use crate::commands::*;
-use indy_vdr::{config::PoolConfig, pool::ProtocolVersion};
-
-use crate::tools::pool::Pool;
-use crate::utils::table::print_list_table;
 
 use self::chrono::prelude::*;
+use indy_vdr::{config::PoolConfig, pool::ProtocolVersion};
 
 pub mod group {
     use super::*;
@@ -224,7 +225,8 @@ pub mod refresh_command {
 
         let (pool, pool_name) = ensure_connected_pool(&ctx)?;
 
-        Pool::refresh(&pool_name, &pool).map_err(|err| println_err!("Unable to refresh pool. Reason: {}", err.message(None)))?;
+        Pool::refresh(&pool_name, &pool)
+            .map_err(|err| println_err!("Unable to refresh pool. Reason: {}", err.message(None)))?;
 
         println_succ!("Pool \"{}\"  has been refreshed", pool_name);
 

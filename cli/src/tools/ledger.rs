@@ -1,8 +1,9 @@
-use crate::error::{CliError, CliResult};
-use crate::tools::did::Did;
+use crate::{
+    error::{CliError, CliResult},
+    tools::did::Did,
+};
 
-use aries_askar::any::AnyStore;
-use aries_askar::future::block_on;
+use aries_askar::{any::AnyStore, future::block_on};
 use indy_utils::did::DidValue;
 use indy_vdr::{
     ledger::{

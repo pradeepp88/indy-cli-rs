@@ -1,12 +1,15 @@
-use crate::command_executor::{
-    Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
-    DynamicCompletionType,
+use crate::{
+    command_executor::{
+        Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata,
+        CommandParams, DynamicCompletionType,
+    },
+    commands::{
+        ledger::{handle_transaction_response, Response},
+        *,
+    },
+    tools::{did::Did, ledger::Ledger},
+    utils::table::print_list_table,
 };
-use crate::commands::ledger::{handle_transaction_response, Response};
-use crate::commands::*;
-use crate::tools::did::Did;
-use crate::tools::ledger::Ledger;
-use crate::utils::table::print_list_table;
 
 pub mod group {
     use super::*;
@@ -197,7 +200,7 @@ pub mod rotate_key_command {
         // get verkey from ledger
         let ledger_verkey = match pool {
             Some((pool, pool_name)) => _get_current_verkey(&pool, &pool_name, &store, &did)?,
-            None => None
+            None => None,
         };
 
         let is_did_on_the_ledger = ledger_verkey.is_some();
@@ -414,10 +417,14 @@ pub fn did_list(ctx: &CommandContext) -> Vec<String> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::commands::ledger::tests::send_nym;
-    use crate::commands::pool::tests::{create_and_connect_pool, disconnect_and_delete_pool};
-    use crate::commands::wallet::tests::{close_and_delete_wallet, create_and_open_wallet};
-    use crate::tools::did::{Did, DidInfo};
+    use crate::{
+        commands::{
+            ledger::tests::send_nym,
+            pool::tests::{create_and_connect_pool, disconnect_and_delete_pool},
+            wallet::tests::{close_and_delete_wallet, create_and_open_wallet},
+        },
+        tools::did::{Did, DidInfo},
+    };
 
     pub const SEED_TRUSTEE: &'static str = "000000000000000000000000Trustee1";
     pub const DID_TRUSTEE: &'static str = "V4SGRU86Z58d6TV7PBUe6f";

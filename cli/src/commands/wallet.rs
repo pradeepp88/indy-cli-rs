@@ -1,12 +1,14 @@
-use crate::command_executor::{
-    Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
-    DynamicCompletionType,
-};
-use crate::commands::*;
-use crate::tools::wallet::{Credentials, Wallet};
-use crate::utils::{
-    table::print_list_table,
-    wallet_config::{Config, WalletConfig},
+use crate::{
+    command_executor::{
+        Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata,
+        CommandParams, DynamicCompletionType,
+    },
+    commands::*,
+    tools::wallet::{Credentials, Wallet},
+    utils::{
+        table::print_list_table,
+        wallet_config::{Config, WalletConfig},
+    },
 };
 
 pub mod group {
@@ -1044,8 +1046,10 @@ pub mod tests {
     }
 
     mod import {
-        use super::did::tests::{new_did, use_did, DID_MY1, SEED_MY1};
-        use super::*;
+        use super::{
+            did::tests::{new_did, use_did, DID_MY1, SEED_MY1},
+            *,
+        };
 
         #[ignore]
         #[test]

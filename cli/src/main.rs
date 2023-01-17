@@ -24,16 +24,17 @@ mod tools;
 
 use crate::command_executor::CommandExecutor;
 
-use crate::commands::{common, did, ledger, pool, wallet};
-use crate::utils::history;
+use crate::{
+    commands::{common, did, ledger, pool, wallet},
+    utils::history,
+};
 
-use linefeed::complete::{Completer, Completion};
-use linefeed::{ReadResult, Reader, Signal, Terminal};
+use linefeed::{
+    complete::{Completer, Completion},
+    ReadResult, Reader, Signal, Terminal,
+};
 
-use std::env;
-use std::fs::File;
-use std::io::BufReader;
-use std::rc::Rc;
+use std::{env, fs::File, io::BufReader, rc::Rc};
 
 fn main() {
     #[cfg(target_os = "windows")]

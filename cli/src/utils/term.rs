@@ -22,8 +22,6 @@ macro_rules! println_succ {
     )
 }
 
-
-
 #[macro_export]
 macro_rules! println_warn {
     ($($arg:tt)*) => (

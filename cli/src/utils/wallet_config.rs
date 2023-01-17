@@ -1,10 +1,12 @@
-use serde_json::Value as JsonValue;
-use std::fs;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::PathBuf;
-
 use crate::utils::environment::EnvironmentUtils;
+
+use serde_json::Value as JsonValue;
+use std::{
+    fs,
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {

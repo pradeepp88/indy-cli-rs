@@ -6,32 +6,35 @@ license = "MIT/Apache-2.0"
 homepage = "https://github.com/hyperledger/indy-cli-rs.git"
 description = """\
 This is command line interface for Indy, which provides a distributed-ledger-based foundation for self-sovereign identity."""
-edition = "2018"
+readme = "../README.md"
+edition = "2021"
+categories = ["authentication", "cryptography"]
+keywords = ["hyperledger", "indy", "ssi", "verifiable", "credentials"]
 
 # Causes the build to fail on all warnings
 fatal_warnings = []
 
 [dependencies]
-aries-askar = { git = "https://github.com/Artemkaaas/aries-askar.git" }
-indy-vdr = "0.3.4"
-indy-utils = "0.5.0"
-atty = "0.2"
 ansi_term = "0.12.1"
+aries-askar = { git = "https://github.com/Artemkaaas/aries-askar.git" }
+atty = "0.2"
 chrono = "0.4"
 dirs = "4.0.0"
-unescape = "0.1"
+failure_derive = "0.1.8"
+hex = "0.4.3"
+indy-utils = "0.5.0"
+indy-vdr = "0.3.4"
 linefeed = "0.3.0"
 log = "0.4.17"
 log4rs = "1.2.0"
 prettytable-rs = "0.10.0"
-serde = "1.0.152"
-serde_json = "1.0.91"
-serde_derive = "1.0.152"
-term = "0.7.0"
 rpassword = "7.2.0"
-failure_derive = "0.1.8"
+serde = "1.0.152"
+serde_derive = "1.0.152"
+serde_json = "1.0.91"
+term = "0.7.0"
 thiserror = "1.0.38"
-hex = "0.4.3"
+unescape = "0.1"
 
 [package.metadata.deb]
 depends = "libncursesw5-dev"

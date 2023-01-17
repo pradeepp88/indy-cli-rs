@@ -1,7 +1,9 @@
 use linefeed::{Reader, Terminal};
 
-use crate::utils::environment::EnvironmentUtils;
-use crate::utils::file::{read_lines_from_file, write_file};
+use crate::utils::{
+    environment::EnvironmentUtils,
+    file::{read_lines_from_file, write_file},
+};
 
 const HISTORY_SIZE: usize = 100;
 const SECRET_DATA: [&str; 2] = [" seed=", " key="];

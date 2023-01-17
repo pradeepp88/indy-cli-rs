@@ -1,5 +1,7 @@
-use crate::error::{CliError, CliResult};
-use crate::utils::pool_config::{Config, PoolConfig};
+use crate::{
+    error::{CliError, CliResult},
+    utils::pool_config::{Config, PoolConfig},
+};
 
 use aries_askar::future::block_on;
 use indy_vdr::{

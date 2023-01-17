@@ -1,28 +1,40 @@
 extern crate chrono;
 
-use crate::command_executor::{
-    Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
+use crate::{
+    command_executor::{
+        Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
+    },
+    commands::*,
+    tools::ledger::Ledger,
 };
-use crate::commands::*;
-use crate::tools::ledger::Ledger;
 
-use crate::error::CliResult;
-use indy_vdr::pool::PreparedRequest;
-use std::collections::{BTreeMap, HashMap};
-
-use crate::utils::file::{read_file, write_file};
-use crate::utils::table::{print_list_table, print_table};
+use crate::{
+    error::CliResult,
+    utils::{
+        file::{read_file, write_file},
+        table::{print_list_table, print_table},
+    },
+};
 
 use self::chrono::prelude::*;
 
 use indy_utils::did::DidValue;
-use indy_vdr::ledger::identifiers::{CredentialDefinitionId, SchemaId};
-use indy_vdr::ledger::requests::cred_def::{
-    CredentialDefinition, CredentialDefinitionData, CredentialDefinitionV1, SignatureType,
+use indy_vdr::{
+    ledger::{
+        identifiers::{CredentialDefinitionId, SchemaId},
+        requests::{
+            cred_def::{
+                CredentialDefinition, CredentialDefinitionData, CredentialDefinitionV1,
+                SignatureType,
+            },
+            node::{NodeOperationData, Services},
+            schema::{AttributeNames, Schema, SchemaV1},
+        },
+    },
+    pool::PreparedRequest,
 };
-use indy_vdr::ledger::requests::node::{NodeOperationData, Services};
-use indy_vdr::ledger::requests::schema::{AttributeNames, Schema, SchemaV1};
 use serde_json::Value as JsonValue;
+use std::collections::{BTreeMap, HashMap};
 
 pub const SIGN_REQUEST: bool = true;
 pub const SEND_REQUEST: bool = true;
@@ -2342,16 +2354,19 @@ pub struct ReplyResult<T> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::commands::did::tests::{
-        new_did, use_did, DID_MY1, DID_MY3, DID_TRUSTEE, SEED_MY3, SEED_TRUSTEE, VERKEY_MY1,
-        VERKEY_MY3,
+    use crate::{
+        commands::{
+            did::tests::{
+                new_did, use_did, DID_MY1, DID_MY3, DID_TRUSTEE, SEED_MY3, SEED_TRUSTEE,
+                VERKEY_MY1, VERKEY_MY3,
+            },
+            pool::tests::disconnect_and_delete_pool,
+            wallet::tests::{
+                close_and_delete_wallet, close_wallet, create_and_open_wallet, open_wallet,
+            },
+        },
+        tools::{did::Did, ledger::Ledger},
     };
-    use crate::commands::pool::tests::disconnect_and_delete_pool;
-    use crate::commands::wallet::tests::{
-        close_and_delete_wallet, close_wallet, create_and_open_wallet, open_wallet,
-    };
-    use crate::tools::did::Did;
-    use crate::tools::ledger::Ledger;
     use std::ops::Deref;
 
     const TRANSACTION: &str = r#"{"reqId":1,"identifier":"V4SGRU86Z58d6TV7PBUe6f","operation":{"type":"105","dest":"V4SGRU86Z58d6TV7PBUe6f"},"protocolVersion":2}"#;

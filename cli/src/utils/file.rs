@@ -1,8 +1,8 @@
-use std::fs::{DirBuilder, File, OpenOptions};
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{DirBuilder, File, OpenOptions},
+    io::{BufRead, BufReader, Read, Write},
+    path::{Path, PathBuf},
+};
 
 pub fn read_file<P: AsRef<Path>>(file: P) -> Result<String, String> {
     let mut file = File::open(file)
