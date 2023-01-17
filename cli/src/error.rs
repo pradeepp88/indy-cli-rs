@@ -105,10 +105,9 @@ impl CliError {
                 }
             },
             CliError::AskarError(askar_error) => match askar_error.kind() {
-                AskarErrorKind::Backend => format!(
-                    "Wallet error occurred \"{}\".",
-                    askar_error.to_string()
-                ),
+                AskarErrorKind::Backend => {
+                    format!("Wallet error occurred \"{}\".", askar_error.to_string())
+                }
                 AskarErrorKind::Busy => {
                     format!("Unable to query wallet \"{}\".", extra.unwrap_or_default())
                 }

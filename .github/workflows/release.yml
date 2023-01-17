@@ -1,0 +1,206 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+
+jobs:
+
+  checks:
+    name: check releases
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      current_version: ${{ steps.current_version.outputs.current_version }}
+      release_info: ${{ steps.release_info.outputs.release_info }}
+      asset_crate_url: ${{ steps.release_info.outputs.asset_crate_url }}
+      upload_url:  ${{ steps.release_info.outputs.upload_url }}
+      already_in_crates_io: ${{ steps.check_in_crates_io.outputs.already_in_crates_io != '' }}
+    defaults:
+      run:
+        working-directory: cli
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get current version
+        id: current_version
+        run: |
+          version="$(cargo -q metadata --no-deps \
+            | jq -r '.packages[] | select(.name == "${{ env.PKG_NAME }}") | .version')"
+          echo "$version"
+          echo "::set-output name=current_version::$version"
+        shell: bash
+
+      - name: Get release info
+        id: release_info
+        run: |
+          release_info="$(curl -s https://api.github.com/repos/${{ github.repository }}/releases \
+              | jq '.[] | select(.name == "v${{ steps.current_version.outputs.current_version }}")')"
+          echo "::set-output name=release_info::$release_info"
+          echo "$release_info"
+
+          asset_crate_url="$(echo "$release_info" \
+              | jq -r '.assets[] | select(.name | match("^${{ env.PKG_NAME }}.*\\.crate$")) | .browser_download_url')"
+          echo "::set-output name=asset_crate_url::$asset_crate_url"
+          echo "$asset_crate_url"
+
+          upload_url="$(echo "$release_info" | jq -r '.upload_url')"
+          echo "::set-output name=upload_url::$upload_url"
+          echo "$upload_url"
+        shell: bash
+
+      - name: Check if already deployed to crates.io
+        id: check_in_crates_io
+        run: |
+          out="$(curl -s https://crates.io/api/v1/crates/${{ env.PKG_NAME }} | jq -r '.versions[] | .num' \
+            | grep '^${{ steps.current_version.outputs.current_version }}$')"
+          echo "in crates.io check: $out"
+          echo "::set-output name=already_in_crates_io::$out"
+        shell: bash {0}  # to opt-out of default fail-fast behavior
+
+  create_release:
+    name: Create release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: checks
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create GitHub Release
+        id: create_release
+        if: ${{ !needs.checks.outputs.release_info }}
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.checks.outputs.current_version }}
+          release_name: v${{ needs.checks.outputs.current_version }}
+
+      - name: Set upload url
+        id: upload_url
+        if: ${{ !needs.checks.outputs.asset_crate_url }}
+        run: |
+          if [[ -n "${{ needs.checks.outputs.upload_url }}" ]]; then
+            echo "::set-output name=value::${{ needs.checks.outputs.upload_url }}"
+          else
+            echo "::set-output name=value::${{ steps.create_release.outputs.upload_url }}"
+          fi
+
+    publish_crate:
+      name: Publish crate
+      # Enable this when all dependencies are published
+      if: ${{ false }} #github.ref == 'refs/heads/main'
+      runs-on: ubuntu-latest
+      needs: [ checks, create_release ]
+      defaults:
+        run:
+          working-directory: cli
+
+      steps:
+        - uses: actions/checkout@v3
+
+        - name: Install Rust toolchain
+          uses: dtolnay/rust-toolchain@stable
+
+        - name: Package and verify crate
+          id: build_crate
+          if: ${{ !needs.checks.outputs.asset_crate_url }}
+          run: |
+            cargo package
+            
+            # TODO
+            #   - verify that it's not more than crates.io limit (10 MB)
+            #   - explore whether we need to upload another artifact (without extension)
+            ls -la target/package
+            cargo package --list
+            
+            asset_name="$(find target/package -name '*.crate' -printf '%f')"
+            echo "::set-output name=asset_name::$asset_name"
+          shell: bash
+
+        - name: Upload crate to GitHub
+          if: ${{ !needs.checks.outputs.asset_crate_url }}
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ needs.checks.outputs.upload_url }}
+            asset_path: target/package/${{ steps.build_crate.outputs.asset_name }}
+            asset_name: ${{ steps.build_crate.outputs.asset_name }}
+            asset_content_type: application/octet-stream  # TODO check for less generic type
+
+#        - name: Publish to crates.io
+#          if: needs.checks.outputs.already_in_crates_io == 'false'
+#          env:
+#            CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+#          run: cargo publish
+#          shell: bash
+
+
+    publish_assets:
+      name: Publish binary assets
+      if: github.ref == 'refs/heads/main'
+      needs: [ checks, create_release, publish_crate ]
+      strategy:
+        matrix:
+          matrix:
+            include:
+              - arch: linux-x86_64
+                os: ubuntu-latest
+                lib: indy-cli-rs.so
+                target: x86_64-unknown-linux-gnu
+                # using cross here to build against an older glibc for compatibility
+                # use_cross: true
+              - arch: windows-x86_64
+                os: windows-latest
+                lib: indy-cli-rs.dll
+                target: x86_64-pc-windows-msvc
+              - arch: darwin-x86_64
+                os: macos-11
+                lib: indy-cli-rs.dylib
+                target: x86_64-apple-darwin
+              - arch: darwin-aarch64
+                os: macos-11
+                lib: indy-cli-rs.dylib
+                target: aarch64-apple-darwin
+                # beta or nightly required for aarch64-apple-darwin target
+                toolchain: beta
+      defaults:
+        run:
+          working-directory: cli
+
+      runs-on: ${{ matrix.os }}
+
+      steps:
+        - uses: actions/checkout@v3
+
+        - name: Install Rust toolchain
+          uses: dtolnay/rust-toolchain@stable
+          with:
+            toolchain: ${{ matrix.toolchain || 'stable' }}
+
+        - name: Cache cargo resources
+          uses: Swatinem/rust-cache@v2
+
+        - name: Build and pack binary
+          id: build_assets
+          env:
+          run: |
+            cargo build --target ${{ matrix.target }} --locked
+            asset_name=indy-cli-rs-${{ needs.checks.outputs.current_version }}-${{ matrix.arch }}.zip
+            zip -r -q assets/$asset_name target/$TARGET/release/
+            echo "::set-output name=asset_name::$asset_name"
+          shell: bash
+
+        - name: Upload binary to GitHub release
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ needs.checks.outputs.upload_url }}
+            asset_path: assets/${{ steps.build_assets.outputs.asset_name }}
+            asset_name: ${{ steps.build_assets.outputs.asset_name }}
+            asset_content_type: application/zip

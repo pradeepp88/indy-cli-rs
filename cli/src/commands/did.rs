@@ -69,18 +69,17 @@ pub mod new_command {
 pub mod set_metadata_command {
     use super::*;
 
-    command!(CommandMetadata::build(
-        "set-metadata",
-        "Updated metadata for a DID in the wallet."
-    )
-    .add_required_param_with_dynamic_completion(
-        "did",
-        "Did stored in wallet",
-        DynamicCompletionType::Did
-    )
-    .add_required_param("metadata", "Metadata to set.")
-    .add_example(r#"did set-metadata did=VsKV7grR1BUE29mG2Fm2kX metadata={"label":"Main"}"#)
-    .finalize());
+    command!(
+        CommandMetadata::build("set-metadata", "Updated metadata for a DID in the wallet.")
+            .add_required_param_with_dynamic_completion(
+                "did",
+                "Did stored in wallet",
+                DynamicCompletionType::Did
+            )
+            .add_required_param("metadata", "Metadata to set.")
+            .add_example(r#"did set-metadata did=VsKV7grR1BUE29mG2Fm2kX metadata={"label":"Main"}"#)
+            .finalize()
+    );
 
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?}, params {:?}", ctx, params);

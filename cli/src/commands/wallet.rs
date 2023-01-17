@@ -428,7 +428,8 @@ pub mod import_command {
             get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
         let export_path = get_str_param("export_path", params).map_err(error_err!())?;
         let export_key = get_str_param("export_key", params).map_err(error_err!())?;
-        let export_key_derivation_method = get_opt_str_param("export_key_derivation_method", params).map_err(error_err!())?;
+        let export_key_derivation_method =
+            get_opt_str_param("export_key_derivation_method", params).map_err(error_err!())?;
         let storage_type = get_opt_str_param("storage_type", params)
             .map_err(error_err!())?
             .unwrap_or("default");

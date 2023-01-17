@@ -122,8 +122,8 @@ pub mod connect_command {
             close_pool(ctx, &pool, &name)?;
         }
 
-        let pool =
-            Pool::open(name, config, pre_ordered_nodes).map_err(|err| println_err!("{}", err.message(Some(&name))))?;
+        let pool = Pool::open(name, config, pre_ordered_nodes)
+            .map_err(|err| println_err!("{}", err.message(Some(&name))))?;
 
         set_connected_pool(ctx, Some((pool, name.to_owned())));
         println_succ!("Pool \"{}\" has been connected", name);

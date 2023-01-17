@@ -1,0 +1,102 @@
+name: verify
+
+on:
+  pull_request:
+    branches: [main]
+
+
+jobs:
+
+  release-ready:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    defaults:
+      run:
+        shell: bash
+        working-directory: cli
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get current version
+        id: current_version
+        run: |
+          version="$(cargo -q metadata --no-deps \
+            | jq -r '.packages[] | select(.name == "indy-cli-rs") | .version')"
+          echo "$version"
+          echo "::set-output name=current_version::$version"
+
+      - name: Check version format
+        run: |
+          # verify the version has "MAJOR.MINOR.PATCH" parts only
+          echo "${{ steps.current_version.outputs.current_version }}" | grep -e '^[0-9]\+\.[0-9]\+\.[0-9]\+$'
+
+      # TODO improve (DRY): copy-paste from release.yml
+      - name: Get release info
+        id: release_info
+        run: |
+          release_info="$(curl -s https://api.github.com/repos/${{ github.repository }}/releases \
+              | jq '.[] | select(.name == "v${{ steps.current_version.outputs.current_version }}")')"
+          echo "::set-output name=release_info::$release_info"
+          echo "$release_info"
+
+      - name: Check version bumped
+        # TODO check if greater than latest tag / release (?)
+        if: steps.release_info.outputs.release_info
+        run: exit 1
+
+        # Uncomment when all dependencies are published
+#      - name: Check it can be packaged
+#        run: |
+#          cargo package
+#          # TODO verify that it's not more than crates.io limit (10 MB)
+#          ls -la target/package
+#          cargo package --list
+
+  verify:
+    strategy:
+      matrix:
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: cli
+    env:
+      RUST_TEST_THREADS: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo resources
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo check
+        run: cargo check
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Debug build
+        run: cargo build --verbose
+
+      - name: Install docker (Mac OS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install docker
+          colima start --network-address
+
+      - name: Run node pool
+        # Currently, Windows runner does not support Linux containers in Docker
+        # See https://github.com/actions/runner-images/issues/1143
+        if: matrix.os != 'windows-latest'
+        run: |
+          docker build -f ../ci/indy-pool.dockerfile -t test_pool ../ci
+          docker run -d --name indy_pool -p 9701-9708:9701-9708 test_pool
+
+      - name: Run tests
+        if: matrix.os != 'windows-latest'
+        run: cargo test --verbose
