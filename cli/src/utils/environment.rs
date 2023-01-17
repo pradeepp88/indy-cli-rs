@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(test)]
+use std::env;
+
 pub struct EnvironmentUtils {}
 
 impl EnvironmentUtils {
@@ -62,7 +65,7 @@ impl EnvironmentUtils {
     pub fn pool_config_path(id: &str) -> PathBuf {
         let mut path = Self::pool_home_path();
         path.push(id);
-        path.push(id);
+        path.push("config");
         path.set_extension("json");
         path
     }

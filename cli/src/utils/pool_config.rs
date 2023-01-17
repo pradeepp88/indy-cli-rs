@@ -41,7 +41,7 @@ impl PoolConfig {
 
         // store config file
         {
-            path.push(name);
+            path.push("config");
             path.set_extension("json");
 
             let pool_config = json!({ "genesis_txn": txn_path });
