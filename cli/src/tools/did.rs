@@ -119,7 +119,7 @@ impl Did {
         })
     }
 
-    pub fn _set_metadata(store: &AnyStore, did: &str, metadata: &str) -> CliResult<()> {
+    pub fn set_metadata(store: &AnyStore, did: &str, metadata: &str) -> CliResult<()> {
         block_on(async move {
             let (did_entry, mut did_info) =
                 Self::fetch_did(store, &did, true).await?.ok_or_else(|| {
