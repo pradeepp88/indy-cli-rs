@@ -628,8 +628,6 @@ pub mod tests {
     mod refresh {
         use super::*;
 
-        #[ignore]
-        // FIXME: For some reason refresh does not work with with VON network but works with Staging and Prod
         #[test]
         pub fn refresh_works() {
             let ctx = setup();

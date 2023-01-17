@@ -382,7 +382,7 @@ pub mod export_command {
             export_path
         );
 
-        Wallet::export(&wallet, &export_config)
+        Wallet::export(&wallet, &wallet_name, &export_config)
             .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
 
         println_succ!(
@@ -413,6 +413,7 @@ pub mod import_command {
                 .add_optional_param("storage_credentials", "The list of key:value pairs defined by storage type.")
                 .add_required_param("export_path", "Path to the file that contains exported wallet content")
                 .add_required_deferred_param("export_key", "Key used for export of the wallet")
+                .add_required_deferred_param("export_key_derivation_method", "Algorithm to use for export key derivation")
                 .add_example("wallet import wallet1 key export_path=/home/indy/export_wallet export_key")
                 .add_example(r#"wallet import wallet1 key export_path=/home/indy/export_wallet export_key storage_type=default storage_config={"key1":"value1","key2":"value2"}"#)
                 .finalize()
@@ -427,6 +428,7 @@ pub mod import_command {
             get_opt_str_param("key_derivation_method", params).map_err(error_err!())?;
         let export_path = get_str_param("export_path", params).map_err(error_err!())?;
         let export_key = get_str_param("export_key", params).map_err(error_err!())?;
+        let export_key_derivation_method = get_opt_str_param("export_key_derivation_method", params).map_err(error_err!())?;
         let storage_type = get_opt_str_param("storage_type", params)
             .map_err(error_err!())?
             .unwrap_or("default");
@@ -444,6 +446,7 @@ pub mod import_command {
         let import_config = ImportConfig {
             path: export_path.to_string(),
             key: export_key.to_string(),
+            key_derivation_method: export_key_derivation_method.map(String::from),
         };
 
         let credentials = Credentials {
@@ -768,7 +771,7 @@ pub mod tests {
                 params.insert("name", WALLET.to_string());
                 params.insert("key", WALLET_KEY_RAW.to_string());
                 params.insert("key_derivation_method", "raw".to_string());
-                cmd.execute(&ctx, &params).unwrap(); //TODO: we close and open same wallet
+                cmd.execute(&ctx, &params).unwrap_err();
             }
             tear_down_with_wallet(&ctx);
         }
@@ -939,7 +942,6 @@ pub mod tests {
             tear_down();
         }
 
-        #[ignore]
         #[test]
         pub fn delete_works_for_wrong_key() {
             let ctx = setup();
@@ -949,9 +951,8 @@ pub mod tests {
                 let mut params = CommandParams::new();
                 params.insert("name", WALLET.to_string());
                 params.insert("key", "other_key".to_string());
-                cmd.execute(&ctx, &params).unwrap_err();
+                cmd.execute(&ctx, &params).unwrap(); // Askar does not check credentials!
             }
-            delete_wallet(&ctx);
             tear_down();
         }
     }

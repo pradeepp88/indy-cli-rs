@@ -36,6 +36,7 @@ pub struct ExportConfig {
 pub struct ImportConfig {
     pub path: String,
     pub key: String,
+    pub key_derivation_method: Option<String>,
 }
 
 struct AskarCredentials<'a> {
@@ -111,10 +112,6 @@ impl Wallet {
     pub fn delete(config: &Config, credentials: &Credentials) -> CliResult<bool> {
         let wallet_uri = Self::build_wallet_uri(config, credentials, None)?;
 
-        // Workaround to check that provided credentials are correct because Askar does not perform this check on delete call
-        let store = Self::open(config, credentials)?;
-        Self::close(&store)?;
-
         block_on(async move {
             let removed = wallet_uri.remove_backend().await.map_err(CliError::from)?;
             if !removed {
@@ -132,7 +129,7 @@ impl Wallet {
         WalletConfig::list()
     }
 
-    pub fn export(_store: &AnyStore, _export_config: &ExportConfig) -> CliResult<()> {
+    pub fn export(_store: &AnyStore, _name: &str, _export_config: &ExportConfig) -> CliResult<()> {
         Err(CliError::Unimplemented(
             "Wallet exporting is not currently supported!".to_string(),
         ))
@@ -179,12 +176,19 @@ impl Wallet {
     fn build_sqlite_uri(
         config: &Config,
         _credentials: &Credentials,
-        _path: Option<&str>,
+        path: Option<&str>,
     ) -> CliResult<String> {
-        let mut path = EnvironmentUtils::wallet_path(&config.id);
-        path.push(&config.id);
-        path.set_extension("db");
-        let uri = format!("{}://{}", "sqlite", path.to_string_lossy());
+        let path = match path {
+            Some(path) => format!("{}/{}.db", path.to_string(), config.id),
+            None => {
+                let mut path = EnvironmentUtils::wallet_path(&config.id);
+                path.push(&config.id);
+                path.set_extension("db");
+                path.to_string_lossy().to_string()
+            }
+        };
+
+        let uri = format!("{}://{}", "sqlite", path);
         Ok(uri)
     }
 
