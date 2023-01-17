@@ -101,29 +101,18 @@ pub mod connect_command {
         let timeout = get_opt_number_param::<i64>("timeout", params).map_err(error_err!())?;
         let extended_timeout =
             get_opt_number_param::<i64>("extended-timeout", params).map_err(error_err!())?;
-        let _pre_ordered_nodes =
+        let pre_ordered_nodes =
             get_opt_str_array_param("pre-ordered-nodes", params).map_err(error_err!())?;
         let number_read_nodes =
             get_opt_number_param::<usize>("number-read-nodes", params).map_err(error_err!())?;
-
-        // let config = {
-        //     let mut json = JSONMap::new();
-        //     update_json_map_opt_key!(json, "timeout", timeout);
-        //     update_json_map_opt_key!(json, "extended_timeout", extended_timeout);
-        //     update_json_map_opt_key!(json, "preordered_nodes", pre_ordered_nodes);
-        //     update_json_map_opt_key!(json, "number_read_nodes", number_read_nodes);
-        //     JSONValue::from(json).to_string()
-        // };
-
         let protocol_version = ProtocolVersion::from_id(protocol_version as i64).map_err(|_| {
             println_err!("Unexpected Pool protocol version \"{}\".", protocol_version)
         })?;
 
-        // TODO: Clarify settings
         let config = PoolConfig {
             protocol_version,
-            reply_timeout: timeout.unwrap_or(PoolConfig::default_reply_timeout()),
-            ack_timeout: extended_timeout.unwrap_or(PoolConfig::default_ack_timeout()),
+            ack_timeout: timeout.unwrap_or(PoolConfig::default_ack_timeout()),
+            reply_timeout: extended_timeout.unwrap_or(PoolConfig::default_reply_timeout()),
             request_read_nodes: number_read_nodes
                 .unwrap_or(PoolConfig::default_request_read_nodes()),
             ..PoolConfig::default()
@@ -134,7 +123,7 @@ pub mod connect_command {
         }
 
         let pool =
-            Pool::open(name, config).map_err(|err| println_err!("{}", err.message(Some(&name))))?;
+            Pool::open(name, config, pre_ordered_nodes).map_err(|err| println_err!("{}", err.message(Some(&name))))?;
 
         set_connected_pool(ctx, Some((pool, name.to_owned())));
         println_succ!("Pool \"{}\" has been connected", name);

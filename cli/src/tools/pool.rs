@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::{
     error::{CliError, CliResult},
     utils::{
@@ -18,15 +19,24 @@ impl Pool {
         PoolConfig::store(name, config).map_err(CliError::from)
     }
 
-    pub fn open(name: &str, config: OpenPoolConfig) -> CliResult<LocalPool> {
+    pub fn open(name: &str, config: OpenPoolConfig, pre_ordered_nodes: Option<Vec<&str>>) -> CliResult<LocalPool> {
         let pool_transactions_file = PoolConfig::read(name)
             .map_err(|_| CliError::NotFound(format!("Pool \"{}\" does not exist.", name)))?
             .genesis_txn;
+
+        let weight_nodes = pre_ordered_nodes.map(
+            |pre_ordered_nodes|
+                pre_ordered_nodes
+                    .into_iter()
+                    .map(|node| (node.to_string(), 2.0))
+                    .collect::<HashMap<String, f32>>()
+        );
 
         let pool_transactions = PoolTransactions::from_json_file(&pool_transactions_file)?;
 
         PoolBuilder::from(config)
             .transactions(pool_transactions)?
+            .node_weights(weight_nodes)
             .into_local()
             .map_err(CliError::from)
     }

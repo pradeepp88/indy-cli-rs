@@ -3048,7 +3048,7 @@ pub mod tests {
             tear_down_with_wallet_and_pool(&ctx);
         }
 
-        #[test] // TODO: CHECK
+        #[test]
         pub fn schema_works_for_unknown_submitter() {
             let ctx = setup_with_wallet_and_pool();
             new_did(&ctx, SEED_MY3);
