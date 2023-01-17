@@ -1,5 +1,4 @@
 extern crate chrono;
-extern crate regex;
 
 use crate::command_executor::{
     Command, CommandContext, CommandGroup, CommandGroupMetadata, CommandMetadata, CommandParams,
@@ -1175,6 +1174,7 @@ pub mod custom_command {
                     println_err!("There is not a transaction stored into CLI context.");
                     println!("You either need to load transaction using `ledger load-transaction`, or \
                         build a transaction (with passing a `send=false`) to store it into CLI context.");
+                    return Err(());
                 }
             }
         }
@@ -1182,16 +1182,15 @@ pub mod custom_command {
         let mut transaction = PreparedRequest::from_request_json(transaction)
             .map_err(|_| println_err!("Invalid formatted transaction provided."))?;
 
-        let response = if sign {
+        let response_json = if sign {
             let (store, _) = ensure_opened_wallet(&ctx)?;
             let submitter_did = ensure_active_did(&ctx)?;
             Ledger::sign_and_submit_request(&pool, &store, &submitter_did, &mut transaction)
+                .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?
         } else {
             Ledger::submit_request(&pool, &transaction)
+                .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?
         };
-
-        let response_json =
-            response.map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?;
 
         let response = serde_json::from_str::<Response<JsonValue>>(&response_json)
             .map_err(|err| println_err!("Invalid data has been received: {:?}", err))?;
@@ -1214,10 +1213,7 @@ pub mod custom_command {
                 result: None,
                 reason: Some(reason),
             } => {
-                println_err!(
-                    "Transaction has been rejected: {}",
-                    extract_error_message(&reason)
-                );
+                println_err!("Transaction has been rejected: {}", reason);
             }
             _ => {
                 println_err!("Invalid data has been received");
@@ -2228,10 +2224,7 @@ pub fn handle_transaction_response(response: Response<JsonValue>) -> Result<Json
             result: None,
             reason: Some(reason),
         } => {
-            println_err!(
-                "Transaction has been rejected: {}",
-                extract_error_message(&reason)
-            );
+            println_err!("Transaction has been rejected: {}", reason);
             Err(())
         }
         _ => {

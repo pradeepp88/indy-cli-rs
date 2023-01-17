@@ -172,6 +172,11 @@ pub mod open_command {
         reset_active_did(ctx);
 
         if let Some((store, id)) = get_opened_wallet(ctx) {
+            if id == config.id {
+                println_err!("Wallet \"{}\" already opened.", id);
+                return Err(());
+            }
+
             close_wallet(ctx, &store, &id)?;
         }
 

@@ -7,10 +7,6 @@ impl IndyCliLogger {
     pub fn init(path: &str) -> Result<(), String> {
         log4rs::init_file(path, Default::default())
             .map_err(|err| format!("Cannot init Indy CLI logger: {}", err.to_string()))?;
-
-        // FIXME: RESTORE
-        // indy::logger::set_logger(log::logger())
-        //     .map_err(|_| "Cannot init Libindy logger".to_string())
         Ok(())
     }
 }

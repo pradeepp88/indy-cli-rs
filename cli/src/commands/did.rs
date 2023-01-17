@@ -191,11 +191,15 @@ pub mod rotate_key_command {
             .unwrap_or(false);
 
         let did = ensure_active_did(&ctx)?;
-        let (pool, pool_name) = ensure_connected_pool(&ctx)?;
+        let pool = get_connected_pool_with_name(&ctx);
         let (store, _) = ensure_opened_wallet(&ctx)?;
 
         // get verkey from ledger
-        let ledger_verkey = _get_current_verkey(&pool, &pool_name, &store, &did)?;
+        let ledger_verkey = match pool {
+            Some((pool, pool_name)) => _get_current_verkey(&pool, &pool_name, &store, &did)?,
+            None => None
+        };
+
         let is_did_on_the_ledger = ledger_verkey.is_some();
 
         let (new_verkey, update_ledger) = if resume {
@@ -253,6 +257,7 @@ pub mod rotate_key_command {
         };
 
         if update_ledger && is_did_on_the_ledger {
+            let (pool, pool_name) = ensure_connected_pool(&ctx)?;
             let mut request =
                 Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None)
                     .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?;

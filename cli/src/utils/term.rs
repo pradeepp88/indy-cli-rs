@@ -21,11 +21,14 @@ macro_rules! println_succ {
         }
     )
 }
+
+
+
 #[macro_export]
 macro_rules! println_warn {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
-            println!("{}", $crate::ansi_term::Color::Blue.bold().paint(format!($($arg)*)))
+            println!("{}", $crate::ansi_term::Color::Yellow.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
         }

@@ -224,10 +224,7 @@ pub mod refresh_command {
 
         let (pool, pool_name) = ensure_connected_pool(&ctx)?;
 
-        Pool::refresh(&pool_name, &pool).map_err(|err| {
-            println_err!("{}", err.message(Some(&pool_name)));
-            close_pool(ctx, &pool, &pool_name).ok();
-        })?;
+        Pool::refresh(&pool_name, &pool).map_err(|err| println_err!("Unable to refresh pool. Reason: {}", err.message(None)))?;
 
         println_succ!("Pool \"{}\"  has been refreshed", pool_name);
 

@@ -78,10 +78,7 @@ impl CliError {
                     "Pool  \"{}\" genesis transactions file does not exist.",
                     extra.unwrap_or_default()
                 ),
-                VdrErrorKind::Input => format!(
-                    "Invalid value provided for one of the parameters: {:?}",
-                    vdr_error.to_string()
-                ),
+                VdrErrorKind::Input => vdr_error.to_string(),
                 VdrErrorKind::Resource => format!("Unable to send request."),
                 VdrErrorKind::Unavailable => format!("Pool unavailable."),
                 VdrErrorKind::Unexpected => format!(
@@ -112,22 +109,16 @@ impl CliError {
                 AskarErrorKind::Busy => {
                     format!("Unable to query wallet \"{}\".", extra.unwrap_or_default())
                 }
-                AskarErrorKind::Duplicate => format!(
-                    "Record already exist in the wallet \"{}\".",
-                    askar_error.to_string()
-                ),
+                AskarErrorKind::Duplicate => format!("Record already exist in the wallet"),
                 AskarErrorKind::Encryption => format!(
                     "Invalid key provided for the wallet \"{}\"",
                     extra.unwrap_or_default()
                 ),
                 AskarErrorKind::Input => format!(
-                    "Invalid wallet configuration provided. Err \"{}\"",
+                    "Invalid configuration provided for the wallet: {}",
                     askar_error.message().unwrap_or_default()
                 ),
-                AskarErrorKind::NotFound => format!(
-                    "Record not found in the wallet \"{}\"",
-                    extra.unwrap_or_default()
-                ),
+                AskarErrorKind::NotFound => askar_error.to_string(),
                 AskarErrorKind::Custom | AskarErrorKind::Unexpected => format!(
                     "Unexpected wallet error occurred \"{}\"",
                     askar_error.message().unwrap_or_default()

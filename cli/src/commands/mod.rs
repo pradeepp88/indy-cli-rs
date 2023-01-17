@@ -1,4 +1,3 @@
-extern crate regex;
 extern crate serde_json;
 
 pub mod common;
@@ -14,7 +13,6 @@ use aries_askar::any::AnyStore;
 use indy_utils::did::DidValue;
 use indy_utils::Qualifiable;
 use indy_vdr::pool::LocalPool;
-use regex::Regex;
 use std;
 use std::rc::Rc;
 
@@ -222,7 +220,7 @@ pub fn get_number_tuple_array_param<'a>(
 }
 
 pub fn convert_did(did: &str) -> Result<DidValue, ()> {
-    DidValue::from_str(&did).map_err(|_| println_err!("Invalid DID {} stored in the context", did))
+    DidValue::from_str(&did).map_err(|_| println_err!("Invalid DID {} provided", did))
 }
 
 pub fn ensure_active_did(ctx: &CommandContext) -> Result<DidValue, ()> {
@@ -434,14 +432,6 @@ pub fn get_pool_protocol_version(ctx: &CommandContext) -> usize {
     match ctx.get_uint_value("POOL_PROTOCOL_VERSION") {
         Some(protocol_version) => protocol_version as usize,
         None => DEFAULT_POOL_PROTOCOL_VERSION,
-    }
-}
-
-pub fn extract_error_message(error: &str) -> String {
-    let re = Regex::new(r#"\(["'](.*)["'],\)"#).unwrap();
-    match re.captures(error) {
-        Some(message) => message[1].to_string(),
-        None => error.to_string(),
     }
 }
 
