@@ -28,7 +28,7 @@ jobs:
         id: current_version
         run: |
           version="$(cargo -q metadata --no-deps \
-            | jq -r '.packages[] | select(.name == "${{ env.PKG_NAME }}") | .version')"
+            | jq -r '.packages[] | select(.name == "$indy-cli-rs") | .version')"
           echo "$version"
           echo "::set-output name=current_version::$version"
         shell: bash
@@ -42,7 +42,7 @@ jobs:
           echo "$release_info"
 
           asset_crate_url="$(echo "$release_info" \
-              | jq -r '.assets[] | select(.name | match("^${{ env.PKG_NAME }}.*\\.crate$")) | .browser_download_url')"
+              | jq -r '.assets[] | select(.name | match("^indy-cli-rs.*\\.crate$")) | .browser_download_url')"
           echo "::set-output name=asset_crate_url::$asset_crate_url"
           echo "$asset_crate_url"
 
@@ -54,7 +54,7 @@ jobs:
       - name: Check if already deployed to crates.io
         id: check_in_crates_io
         run: |
-          out="$(curl -s https://crates.io/api/v1/crates/${{ env.PKG_NAME }} | jq -r '.versions[] | .num' \
+          out="$(curl -s https://crates.io/api/v1/crates/indy-cli-rs | jq -r '.versions[] | .num' \
             | grep '^${{ steps.current_version.outputs.current_version }}$')"
           echo "in crates.io check: $out"
           echo "::set-output name=already_in_crates_io::$out"
@@ -150,21 +150,17 @@ jobs:
             include:
               - arch: linux-x86_64
                 os: ubuntu-latest
-                lib: indy-cli-rs.so
                 target: x86_64-unknown-linux-gnu
                 # using cross here to build against an older glibc for compatibility
                 # use_cross: true
               - arch: windows-x86_64
                 os: windows-latest
-                lib: indy-cli-rs.dll
                 target: x86_64-pc-windows-msvc
               - arch: darwin-x86_64
                 os: macos-11
-                lib: indy-cli-rs.dylib
                 target: x86_64-apple-darwin
               - arch: darwin-aarch64
                 os: macos-11
-                lib: indy-cli-rs.dylib
                 target: aarch64-apple-darwin
                 # beta or nightly required for aarch64-apple-darwin target
                 toolchain: beta
