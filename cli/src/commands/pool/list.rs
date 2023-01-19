@@ -24,8 +24,8 @@ pub mod list_command {
 
         print_list_table(&pools, &[("pool", "Pool")], "There are no pools defined");
 
-        if let Some((_, cur_pool)) = ctx.get_connected_pool_with_name() {
-            println_succ!("Current pool \"{}\"", cur_pool);
+        if let Some(pool) = ctx.get_connected_pool() {
+            println_succ!("Current pool \"{}\"", pool.name);
         }
 
         trace!("execute <<");

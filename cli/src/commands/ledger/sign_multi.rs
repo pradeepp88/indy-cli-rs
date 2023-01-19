@@ -30,14 +30,14 @@ pub mod sign_multi_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
 
-        let param_txn = ParamParser::get_opt_str_param("txn", params).map_err(error_err!())?;
+        let param_txn = ParamParser::get_opt_str_param("txn", params)?;
 
         let mut txn = get_transaction_to_use!(ctx, param_txn);
 
-        match Ledger::multi_sign_request(&store, &submitter_did, &mut txn) {
+        match Ledger::multi_sign_request(&wallet, &submitter_did, &mut txn) {
             Ok(_) => {
                 println_succ!("Transaction has been signed:");
                 println_succ!("{:?}", txn.req_json.to_string());

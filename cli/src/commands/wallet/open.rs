@@ -36,16 +36,14 @@ pub mod open_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let id = ParamParser::get_str_param("name", params).map_err(error_err!())?;
-        let key = ParamParser::get_str_param("key", params).map_err(error_err!())?;
-        let rekey = ParamParser::get_opt_str_param("rekey", params).map_err(error_err!())?;
-        let key_derivation_method = ParamParser::get_opt_str_param("key_derivation_method", params)
-            .map_err(error_err!())?;
+        let id = ParamParser::get_str_param("name", params)?;
+        let key = ParamParser::get_str_param("key", params)?;
+        let rekey = ParamParser::get_opt_str_param("rekey", params)?;
+        let key_derivation_method =
+            ParamParser::get_opt_str_param("key_derivation_method", params)?;
         let rekey_derivation_method =
-            ParamParser::get_opt_str_param("rekey_derivation_method", params)
-                .map_err(error_err!())?;
-        let storage_credentials = ParamParser::get_opt_object_param("storage_credentials", params)
-            .map_err(error_err!())?;
+            ParamParser::get_opt_str_param("rekey_derivation_method", params)?;
+        let storage_credentials = ParamParser::get_opt_object_param("storage_credentials", params)?;
 
         let config = WalletDirectory::read_wallet_config(id)
             .map_err(|_| println_err!("Wallet \"{}\" isn't attached to CLI", id))?;
@@ -60,19 +58,18 @@ pub mod open_command {
 
         ctx.reset_active_did();
 
-        if let Some((store, id)) = ctx.take_opened_wallet() {
-            if id == config.id {
-                println_err!("Wallet \"{}\" already opened.", id);
+        if let Some(wallet) = ctx.take_opened_wallet() {
+            if wallet.name == config.id {
+                println_err!("Wallet \"{}\" already opened.", wallet.name);
                 return Err(());
             }
-
-            close_wallet(ctx, store, &id)?;
+            close_wallet(ctx, wallet)?;
         }
 
-        let store = Wallet::open(&config, &credentials)
+        let wallet = Wallet::open(&config, &credentials)
             .map_err(|err| println_err!("{}", err.message(Some(&id))))?;
 
-        ctx.set_opened_wallet((store, id.to_owned()));
+        ctx.set_opened_wallet(wallet);
         println_succ!("Wallet \"{}\" has been opened", id);
 
         trace!("execute << {:?}", ());
@@ -82,8 +79,8 @@ pub mod open_command {
     pub fn cleanup(ctx: &CommandContext) {
         trace!("cleanup >> ctx {:?}", ctx);
 
-        if let Some((store, id)) = ctx.take_opened_wallet() {
-            close_wallet(ctx, store, &id).ok();
+        if let Some(wallet) = ctx.take_opened_wallet() {
+            close_wallet(ctx, wallet).ok();
         }
 
         trace!("cleanup <<");

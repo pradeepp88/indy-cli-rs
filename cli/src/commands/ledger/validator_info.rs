@@ -32,21 +32,20 @@ pub mod get_validator_info_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ctx.ensure_connected_pool()?;
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
 
-        let nodes = ParamParser::get_opt_str_array_param("nodes", params).map_err(error_err!())?;
-        let timeout =
-            ParamParser::get_opt_number_param::<i64>("timeout", params).map_err(error_err!())?;
+        let nodes = ParamParser::get_opt_str_array_param("nodes", params)?;
+        let timeout = ParamParser::get_opt_number_param::<i64>("timeout", params)?;
 
         let mut request = Ledger::build_get_validator_info_request(Some(&pool), &submitter_did)
             .map_err(|err| println_err!("{}", err.message(None)))?;
 
         let response = if nodes.is_some() || timeout.is_some() {
-            sign_and_submit_action(&store, &pool, &submitter_did, &mut request, nodes, timeout)
+            sign_and_submit_action(&wallet, &pool, &submitter_did, &mut request, nodes, timeout)
                 .map_err(|err| println_err!("{}", err.message(None)))?
         } else {
-            Ledger::sign_and_submit_request(&pool, &store, &submitter_did, &mut request)
+            Ledger::sign_and_submit_request(&pool, &wallet, &submitter_did, &mut request)
                 .map_err(|err| println_err!("{}", err.message(None)))?
         };
 

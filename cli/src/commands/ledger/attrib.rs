@@ -38,14 +38,14 @@ pub mod attrib_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let pool = ctx.get_connected_pool();
         let submitter_did = ctx.ensure_active_did()?;
 
-        let target_did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
-        let hash = ParamParser::get_opt_str_param("hash", params).map_err(error_err!())?;
-        let raw = ParamParser::get_opt_object_param("raw", params).map_err(error_err!())?;
-        let enc = ParamParser::get_opt_str_param("enc", params).map_err(error_err!())?;
+        let target_did = ParamParser::get_did_param("did", params)?;
+        let hash = ParamParser::get_opt_str_param("hash", params)?;
+        let raw = ParamParser::get_opt_object_param("raw", params)?;
+        let enc = ParamParser::get_opt_str_param("enc", params)?;
 
         let mut request = Ledger::build_attrib_request(
             pool.as_deref(),
@@ -59,14 +59,8 @@ pub mod attrib_command {
 
         set_author_agreement(ctx, &mut request)?;
 
-        let (_, response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         let attribute = if raw.is_some() {
             ("raw", "Raw value")
@@ -112,14 +106,14 @@ pub mod get_attrib_command {
         let submitter_did = ctx.get_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let target_did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
-        let raw = ParamParser::get_opt_str_param("raw", params).map_err(error_err!())?;
-        let hash = ParamParser::get_opt_str_param("hash", params).map_err(error_err!())?;
-        let enc = ParamParser::get_opt_str_param("enc", params).map_err(error_err!())?;
+        let target_did = ParamParser::get_did_param("did", params)?;
+        let raw = ParamParser::get_opt_str_param("raw", params)?;
+        let hash = ParamParser::get_opt_str_param("hash", params)?;
+        let enc = ParamParser::get_opt_str_param("enc", params)?;
 
         let request = Ledger::build_get_attrib_request(
             pool.as_deref(),
-            submitter_did.as_ref(),
+            submitter_did.as_deref(),
             &target_did,
             raw,
             hash,
@@ -127,7 +121,7 @@ pub mod get_attrib_command {
         )
         .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, mut response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
+        let (_, mut response) = send_read_request!(&ctx, params, &request);
 
         if let Some(result) = response.result.as_mut() {
             let data = result["data"]
@@ -165,17 +159,20 @@ pub mod tests {
     use crate::{
         commands::{
             did::tests::{new_did, use_did, DID_MY3, DID_TRUSTEE, SEED_MY3},
-            setup_with_wallet_and_pool, tear_down_with_wallet_and_pool,
+            setup_with_wallet_and_pool, submit_retry, tear_down_with_wallet_and_pool,
             wallet::tests::{close_wallet, open_wallet},
         },
         ledger::{
             endorse_transaction_command,
-            tests::{
-                create_new_did, ensure_attrib_added, send_nym, use_new_identity, use_trustee,
-                ATTRIB_ENC_DATA, ATTRIB_HASH_DATA, ATTRIB_RAW_DATA,
-            },
+            tests::{create_new_did, send_nym, use_new_identity, use_trustee, ReplyResult},
         },
     };
+    use indy_utils::did::DidValue;
+
+    const ATTRIB_RAW_DATA: &str = r#"{"endpoint":{"ha":"127.0.0.1:5555"}}"#;
+    const ATTRIB_HASH_DATA: &str =
+        r#"83d907821df1c87db829e96569a11f6fc2e7880acba5e43d07ab786959e13bd3"#;
+    const ATTRIB_ENC_DATA: &str = r#"aa3f41f619aa7e5e6b6d0d"#;
 
     mod attrib {
         use super::*;
@@ -441,5 +438,42 @@ pub mod tests {
             }
             tear_down_with_wallet_and_pool(&ctx);
         }
+    }
+
+    pub fn ensure_attrib_added(
+        ctx: &CommandContext,
+        did: &str,
+        raw: Option<&str>,
+        hash: Option<&str>,
+        enc: Option<&str>,
+    ) -> Result<(), ()> {
+        let pool = ctx.get_connected_pool().unwrap();
+        let attr = if raw.is_some() {
+            Some("endpoint")
+        } else {
+            None
+        };
+        let did = DidValue(did.to_string());
+        let request =
+            Ledger::build_get_attrib_request(Some(&pool), None, &did, attr, hash, enc).unwrap();
+        submit_retry(ctx, &request, |response| {
+            serde_json::from_str::<Response<ReplyResult<String>>>(&response)
+                .map_err(|_| ())
+                .and_then(|response| {
+                    let expected_value = if raw.is_some() {
+                        raw.unwrap()
+                    } else if hash.is_some() {
+                        hash.unwrap()
+                    } else {
+                        enc.unwrap()
+                    };
+                    if response.result.is_some() && expected_value == response.result.unwrap().data
+                    {
+                        Ok(())
+                    } else {
+                        Err(())
+                    }
+                })
+        })
     }
 }

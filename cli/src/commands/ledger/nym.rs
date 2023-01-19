@@ -40,16 +40,16 @@ pub mod nym_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let pool = ctx.get_connected_pool();
         let submitter_did = ctx.ensure_active_did()?;
 
-        let target_did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
-        let verkey = ParamParser::get_opt_str_param("verkey", params).map_err(error_err!())?;
-        let role = ParamParser::get_opt_empty_str_param("role", params).map_err(error_err!())?;
+        let target_did = ParamParser::get_did_param("did", params)?;
+        let verkey = ParamParser::get_opt_str_param("verkey", params)?;
+        let role = ParamParser::get_opt_empty_str_param("role", params)?;
 
         if let Some(target_verkey) = verkey {
-            let did_info = Did::get(&store, &target_did);
+            let did_info = Did::get(&wallet, &target_did);
 
             if let Ok(ref did_info) = did_info {
                 let verkey_ = Did::abbreviate_verkey(&did_info.did, &did_info.verkey)
@@ -83,14 +83,8 @@ pub mod nym_command {
 
         set_author_agreement(ctx, &mut request)?;
 
-        let (_, mut response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, mut response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         if let Some(result) = response.result.as_mut() {
             result["txn"]["data"]["role"] =
@@ -130,13 +124,13 @@ pub mod get_nym_command {
         let submitter_did = ctx.get_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let target_did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
+        let target_did = ParamParser::get_did_param("did", params)?;
 
         let request =
-            Ledger::build_get_nym_request(pool.as_deref(), submitter_did.as_ref(), &target_did)
+            Ledger::build_get_nym_request(pool.as_deref(), submitter_did.as_deref(), &target_did)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, mut response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
+        let (_, mut response) = send_read_request!(&ctx, params, &request);
 
         if let Some(result) = response.result.as_mut() {
             let data = serde_json::from_str::<JsonValue>(&result["data"].as_str().unwrap_or(""));
@@ -181,13 +175,14 @@ pub mod tests {
                 new_did, use_did, DID_MY1, DID_MY3, DID_TRUSTEE, SEED_MY3, VERKEY_MY1, VERKEY_MY3,
             },
             pool::tests::disconnect_and_delete_pool,
-            setup_with_wallet, setup_with_wallet_and_pool, tear_down, tear_down_with_wallet,
-            tear_down_with_wallet_and_pool,
+            setup_with_wallet, setup_with_wallet_and_pool, submit_retry, tear_down,
+            tear_down_with_wallet, tear_down_with_wallet_and_pool,
             wallet::tests::close_and_delete_wallet,
         },
-        ledger::tests::{_ensure_nym_added, create_new_did, use_trustee},
+        ledger::tests::{create_new_did, use_trustee, ReplyResult},
         pool::constants::DEFAULT_POOL_PROTOCOL_VERSION,
     };
+    use indy_utils::did::DidValue;
 
     mod nym {
         use super::*;
@@ -205,7 +200,7 @@ pub mod tests {
                 params.insert("verkey", verkey);
                 cmd.execute(&ctx, &params).unwrap();
             }
-            assert!(_ensure_nym_added(&ctx, &did).is_ok());
+            assert!(ensure_nym_added(&ctx, &did).is_ok());
             tear_down_with_wallet_and_pool(&ctx);
         }
 
@@ -222,7 +217,7 @@ pub mod tests {
                 params.insert("role", "TRUSTEE".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            assert!(_ensure_nym_added(&ctx, &did).is_ok());
+            assert!(ensure_nym_added(&ctx, &did).is_ok());
             tear_down_with_wallet_and_pool(&ctx);
         }
 
@@ -319,7 +314,7 @@ pub mod tests {
                 params.insert("send", "false".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
-            assert!(_ensure_nym_added(&ctx, &did).is_err());
+            assert!(ensure_nym_added(&ctx, &did).is_err());
             assert!(ctx.get_context_transaction().is_some());
             tear_down_with_wallet_and_pool(&ctx);
         }
@@ -418,5 +413,16 @@ pub mod tests {
             }
             tear_down_with_wallet_and_pool(&ctx);
         }
+    }
+
+    pub fn ensure_nym_added(ctx: &CommandContext, did: &str) -> Result<(), ()> {
+        let pool = ctx.get_connected_pool().unwrap();
+        let did = DidValue(did.to_string());
+        let request = Ledger::build_get_nym_request(Some(&pool), None, &did).unwrap();
+        submit_retry(ctx, &request, |response| {
+            serde_json::from_str::<Response<ReplyResult<String>>>(&response).and_then(|response| {
+                serde_json::from_str::<JsonValue>(&response.result.unwrap().data)
+            })
+        })
     }
 }

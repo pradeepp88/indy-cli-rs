@@ -39,24 +39,19 @@ pub mod node_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let target_did = ParamParser::get_did_param("target", params).map_err(error_err!())?;
-        let alias = ParamParser::get_str_param("alias", params).map_err(error_err!())?;
-        let node_ip = ParamParser::get_opt_str_param("node_ip", params).map_err(error_err!())?;
-        let node_port =
-            ParamParser::get_opt_number_param::<i32>("node_port", params).map_err(error_err!())?;
-        let client_ip =
-            ParamParser::get_opt_str_param("client_ip", params).map_err(error_err!())?;
-        let client_port = ParamParser::get_opt_number_param::<i32>("client_port", params)
-            .map_err(error_err!())?;
-        let blskey = ParamParser::get_opt_str_param("blskey", params).map_err(error_err!())?;
-        let blskey_pop =
-            ParamParser::get_opt_str_param("blskey_pop", params).map_err(error_err!())?;
-        let services =
-            ParamParser::get_opt_str_array_param("services", params).map_err(error_err!())?;
+        let target_did = ParamParser::get_did_param("target", params)?;
+        let alias = ParamParser::get_str_param("alias", params)?;
+        let node_ip = ParamParser::get_opt_str_param("node_ip", params)?;
+        let node_port = ParamParser::get_opt_number_param::<i32>("node_port", params)?;
+        let client_ip = ParamParser::get_opt_str_param("client_ip", params)?;
+        let client_port = ParamParser::get_opt_number_param::<i32>("client_port", params)?;
+        let blskey = ParamParser::get_opt_str_param("blskey", params)?;
+        let blskey_pop = ParamParser::get_opt_str_param("blskey_pop", params)?;
+        let services = ParamParser::get_opt_str_array_param("services", params)?;
 
         let services = match services {
             Some(services) => Some(
@@ -90,14 +85,8 @@ pub mod node_command {
             Ledger::build_node_request(pool.as_deref(), &submitter_did, &target_did, node_data)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         handle_transaction_response(response).map(|result| {
             print_transaction_response(

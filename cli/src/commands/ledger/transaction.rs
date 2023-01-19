@@ -25,7 +25,7 @@ pub mod save_transaction_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let file = ParamParser::get_str_param("file", params).map_err(error_err!())?;
+        let file = ParamParser::get_str_param("file", params)?;
 
         let transaction = ctx.ensure_context_transaction()?;
 
@@ -40,7 +40,7 @@ pub mod save_transaction_command {
         }
 
         write_file(file, &transaction)
-            .map_err(|err| println_err!("Cannot store transaction into the file: {:?}", err))?;
+            .map_err(|err| println_err!("Cannot wallet transaction into the file: {:?}", err))?;
 
         println_succ!("The transaction has been saved.");
 
@@ -62,7 +62,7 @@ pub mod load_transaction_command {
 
     command!(CommandMetadata::build(
         "load-transaction",
-        "Read transaction from a file and store it into CLI context."
+        "Read transaction from a file and wallet it into CLI context."
     )
     .add_required_param("file", "The path to file containing a transaction to load.")
     .add_example(r#"ledger load-transaction /home/transaction.txt"#)
@@ -71,7 +71,7 @@ pub mod load_transaction_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let file = ParamParser::get_str_param("file", params).map_err(error_err!())?;
+        let file = ParamParser::get_str_param("file", params)?;
 
         let transaction = read_file(file).map_err(|err| println_err!("{}", err))?;
 
@@ -92,8 +92,14 @@ pub mod tests {
     use super::*;
     use crate::{
         commands::{did::tests::DID_TRUSTEE, setup, tear_down},
-        ledger::tests::{_path, TRANSACTION},
+        ledger::tests::TRANSACTION,
     };
+
+    fn path() -> (::std::path::PathBuf, String) {
+        let mut path = crate::utils::environment::EnvironmentUtils::indy_home_path();
+        path.push("transaction");
+        (path.clone(), path.to_str().unwrap().to_string())
+    }
 
     mod save_transaction {
         use super::*;
@@ -102,7 +108,7 @@ pub mod tests {
         pub fn save_transaction_works_for_no_txn_into_context() {
             let ctx = setup();
 
-            let (_, path_str) = _path();
+            let (_, path_str) = path();
             {
                 let cmd = save_transaction_command::new();
                 let mut params = CommandParams::new();
@@ -121,7 +127,7 @@ pub mod tests {
         pub fn load_transaction_works() {
             let ctx = setup();
 
-            let (_, path_str) = _path();
+            let (_, path_str) = path();
             write_file(&path_str, TRANSACTION).unwrap();
 
             {
@@ -142,7 +148,7 @@ pub mod tests {
         pub fn load_transaction_works_for_invalid_transaction() {
             let ctx = setup();
 
-            let (_, path_str) = _path();
+            let (_, path_str) = path();
             write_file(&path_str, "some invalid transaction").unwrap();
 
             {
@@ -177,7 +183,7 @@ pub mod tests {
             let long_request = json!({"reqId": 111, "identifier": DID_TRUSTEE, "operation": {"type": "1", "data": "some extra data to make it long"}}).to_string();
 
             // Write long
-            let (_, path_str) = _path();
+            let (_, path_str) = path();
             {
                 ctx.set_context_transaction(Some(long_request));
 
@@ -188,7 +194,7 @@ pub mod tests {
             }
 
             // Write short
-            let (_, path_str) = _path();
+            let (_, path_str) = path();
             {
                 ctx.set_context_transaction(Some(short_request));
 

@@ -25,8 +25,8 @@ pub mod list_command {
             "There are no wallets",
         );
 
-        if let Some((_, cur_wallet)) = ctx.get_opened_wallet() {
-            println_succ!("Current wallet \"{}\"", cur_wallet);
+        if let Some(wallet) = ctx.get_opened_wallet() {
+            println_succ!("Current wallet \"{}\"", wallet.name);
         }
 
         trace!("execute << ");

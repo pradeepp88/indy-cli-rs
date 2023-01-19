@@ -1,5 +1,6 @@
 use unescape::unescape;
 
+use indy_utils::did::DidValue;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -229,6 +230,7 @@ pub struct CommandContext {
     is_exit: RefCell<bool>,
     pool: RefCell<Option<Rc<Pool>>>,
     wallet: RefCell<Option<Rc<Wallet>>>,
+    did: RefCell<Option<Rc<DidValue>>>,
     int_values: RefCell<HashMap<&'static str, i32>>,
     uint_values: RefCell<HashMap<&'static str, u64>>,
     string_values: RefCell<HashMap<&'static str, String>>,
@@ -262,6 +264,7 @@ impl CommandContext {
             is_exit: RefCell::new(false),
             pool: RefCell::new(None),
             wallet: RefCell::new(None),
+            did: RefCell::new(None),
             int_values: RefCell::new(HashMap::new()),
             uint_values: RefCell::new(HashMap::new()),
             string_values: RefCell::new(HashMap::new()),
@@ -303,27 +306,38 @@ impl CommandContext {
         *self.is_exit.borrow()
     }
 
-    pub fn set_wallet_value(&self, value: Option<Wallet>) {
+    pub fn set_wallet(&self, value: Option<Wallet>) {
         match value {
             Some(value) => self.wallet.replace(Some(Rc::new(value))),
             None => self.wallet.replace(None),
         };
     }
 
-    pub fn get_wallet_value(&self) -> Option<Rc<Wallet>> {
+    pub fn get_wallet(&self) -> Option<Rc<Wallet>> {
         self.wallet.borrow().clone()
     }
 
-    pub fn take_wallet_value(&self) -> Option<Rc<Wallet>> {
+    pub fn take_wallet(&self) -> Option<Rc<Wallet>> {
         self.wallet.take()
     }
 
-    pub fn set_pool_value(&self, value: Option<Pool>) {
+    pub fn set_pool(&self, value: Option<Pool>) {
         self.pool.replace(value.map(|value| Rc::new(value)));
     }
 
-    pub fn get_pool_value(&self) -> Option<Rc<Pool>> {
+    pub fn get_pool(&self) -> Option<Rc<Pool>> {
         self.pool.borrow().clone()
+    }
+
+    pub fn set_did(&self, value: Option<DidValue>) {
+        match value {
+            Some(value) => self.did.replace(Some(Rc::new(value))),
+            None => self.did.replace(None),
+        };
+    }
+
+    pub fn get_did(&self) -> Option<Rc<DidValue>> {
+        self.did.borrow().clone()
     }
 
     pub fn set_uint_value(&self, key: &'static str, value: Option<u64>) {

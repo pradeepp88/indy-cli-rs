@@ -33,7 +33,7 @@ The most simple way is just start cli by `indy-cli-rs` command and put `help` co
 
 
 ### Notes
-Indy-CLI--rs depends on `term` rust library that has a system dependency on terminfo database. 
+Indy-CLI-rs depends on `term` rust library that has a system dependency on terminfo database. 
 That is why CLI Debian package additionally installs `libncursesw5-dev` library.
 More about it read [here](https://crates.io/crates/term) at `Packaging and Distributing` section.
 

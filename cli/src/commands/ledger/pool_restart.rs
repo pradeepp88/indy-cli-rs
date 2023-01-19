@@ -34,25 +34,23 @@ pub mod pool_restart_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ctx.ensure_connected_pool()?;
-        let pool_name = ctx.ensure_connected_pool_name()?;
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
 
-        let action = ParamParser::get_str_param("action", params).map_err(error_err!())?;
-        let datetime = ParamParser::get_opt_str_param("datetime", params).map_err(error_err!())?;
-        let nodes = ParamParser::get_opt_str_array_param("nodes", params).map_err(error_err!())?;
-        let timeout =
-            ParamParser::get_opt_number_param::<i64>("timeout", params).map_err(error_err!())?;
+        let action = ParamParser::get_str_param("action", params)?;
+        let datetime = ParamParser::get_opt_str_param("datetime", params)?;
+        let nodes = ParamParser::get_opt_str_array_param("nodes", params)?;
+        let timeout = ParamParser::get_opt_number_param::<i64>("timeout", params)?;
 
         let mut request =
             Ledger::indy_build_pool_restart_request(Some(&pool), &submitter_did, action, datetime)
-                .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?;
+                .map_err(|err| println_err!("{}", err.message(Some(&pool.name))))?;
 
         let response = if nodes.is_some() || timeout.is_some() {
-            sign_and_submit_action(&store, &pool, &submitter_did, &mut request, nodes, timeout)
+            sign_and_submit_action(&wallet, &pool, &submitter_did, &mut request, nodes, timeout)
                 .map_err(|err| println_err!("{}", err.message(None)))?
         } else {
-            Ledger::sign_and_submit_request(&pool, &store, &submitter_did, &mut request)
+            Ledger::sign_and_submit_request(&pool, &wallet, &submitter_did, &mut request)
                 .map_err(|err| println_err!("{}", err.message(None)))?
         };
 

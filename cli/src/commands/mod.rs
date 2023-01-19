@@ -13,54 +13,51 @@ use crate::command_executor::CommandContext;
 
 use self::pool::constants::DEFAULT_POOL_PROTOCOL_VERSION;
 
-use indy_utils::{did::DidValue, Qualifiable};
+use indy_utils::did::DidValue;
 use std::rc::Rc;
 
 impl CommandContext {
-    pub fn ensure_active_did(&self) -> Result<DidValue, ()> {
-        match self.get_string_value("ACTIVE_DID") {
-            Some(did) => {
-                DidValue::from_str(&did).map_err(|_| println_err!("Invalid DID {} provided", did))
-            }
-            None => {
+    pub fn set_active_did(&self, did: DidValue) {
+        self.set_did(Some(did.clone()));
+        self.set_sub_prompt(
+            3,
+            Some(format!(
+                "did({}...{})",
+                &did.to_string()[..3],
+                &did[did.len() - 3..]
+            )),
+        );
+    }
+
+    pub fn ensure_active_did(&self) -> Result<Rc<DidValue>, ()> {
+        match self.get_active_did() {
+            Ok(Some(did)) => Ok(did.clone()),
+            _ => {
                 println_err!("There is no active did");
                 Err(())
             }
         }
     }
 
-    pub fn set_active_did(&self, did: String) {
-        self.set_string_value("ACTIVE_DID", Some(did.clone()));
-        self.set_sub_prompt(
-            3,
-            Some(format!("did({}...{})", &did[..3], &did[did.len() - 3..])),
-        );
-    }
-
-    pub fn get_active_did(&self) -> Result<Option<DidValue>, ()> {
-        match self.get_string_value("ACTIVE_DID") {
-            Some(did) => {
-                let did = DidValue::from_str(&did)
-                    .map_err(|_| println_err!("Invalid DID {} provided", did))?;
-                Ok(Some(did))
-            }
+    pub fn get_active_did(&self) -> Result<Option<Rc<DidValue>>, ()> {
+        match self.get_did() {
+            Some(did) => Ok(Some(did)),
             None => Ok(None),
         }
     }
 
     pub fn reset_active_did(&self) {
-        self.set_string_value("ACTIVE_DID", None);
+        self.set_did(None);
         self.set_sub_prompt(3, None);
     }
 
-    pub fn set_opened_wallet(&self, (wallet, wallet_name): (Wallet, String)) {
-        self.set_wallet_value(Some(wallet));
-        self.set_string_value("OPENED_WALLET_NAME", Some(wallet_name.to_owned()));
-        self.set_sub_prompt(2, Some(wallet_name));
+    pub fn set_opened_wallet(&self, wallet: Wallet) {
+        self.set_sub_prompt(2, Some(wallet.name.clone()));
+        self.set_wallet(Some(wallet));
     }
 
     pub fn ensure_opened_wallet(&self) -> Result<Rc<Wallet>, ()> {
-        match self.get_wallet_value() {
+        match self.get_wallet() {
             Some(wallet) => Ok(wallet),
             None => {
                 println_err!("There is no opened wallet now");
@@ -69,55 +66,32 @@ impl CommandContext {
         }
     }
 
-    pub fn ensure_opened_wallet_name(&self) -> Result<String, ()> {
-        let name = self.get_string_value("OPENED_WALLET_NAME");
-
-        match name {
-            Some(name) => Ok(name),
-            _ => {
-                println_err!("There is no opened wallet now");
-                Err(())
-            }
-        }
+    pub fn get_opened_wallet(&self) -> Option<Rc<Wallet>> {
+        self.get_wallet()
     }
 
-    pub fn get_opened_wallet(&self) -> Option<(Rc<Wallet>, String)> {
-        let wallet = self.get_wallet_value();
-        let name = self.get_string_value("OPENED_WALLET_NAME");
-
-        if let (Some(wallet), Some(name)) = (wallet, name) {
-            Some((wallet, name))
-        } else {
-            None
-        }
-    }
-
-    pub fn take_opened_wallet(&self) -> Option<(Wallet, String)> {
-        let wallet = self.take_wallet_value();
-        let name = self.get_string_value("OPENED_WALLET_NAME");
-
-        if let (Some(wallet), Some(name)) = (wallet, name) {
+    pub fn take_opened_wallet(&self) -> Option<Wallet> {
+        let wallet = self.take_wallet();
+        if let Some(wallet) = wallet {
             let wallet = Rc::try_unwrap(wallet).unwrap();
-            Some((wallet, name))
+            Some(wallet)
         } else {
             None
         }
     }
 
-    pub fn reset_wallet(&self) {
-        self.set_wallet_value(None);
-        self.set_string_value("OPENED_WALLET_NAME", None);
+    pub fn reset_opened_wallet(&self) {
+        self.set_wallet(None);
         self.set_sub_prompt(2, None);
     }
 
-    pub fn set_connected_pool(&self, (pool, pool_name): (Pool, String)) {
-        self.set_string_value("CONNECTED_POOL_NAME", Some(pool_name.clone()));
-        self.set_sub_prompt(1, Some(format!("pool({})", pool_name)));
-        self.set_pool_value(Some(pool));
+    pub fn set_connected_pool(&self, pool: Pool) {
+        self.set_sub_prompt(1, Some(format!("pool({})", pool.name)));
+        self.set_pool(Some(pool));
     }
 
     pub fn ensure_connected_pool(&self) -> Result<Rc<Pool>, ()> {
-        match self.get_pool_value() {
+        match self.get_pool() {
             Some(pool) => Ok(pool),
             None => {
                 println_err!("There is no opened pool now");
@@ -126,43 +100,13 @@ impl CommandContext {
         }
     }
 
-    pub fn ensure_connected_pool_name(&self) -> Result<String, ()> {
-        let name = self.get_string_value("CONNECTED_POOL_NAME");
-
-        match name {
-            Some(name) => Ok(name),
-            _ => {
-                println_err!("There is no opened pool now");
-                Err(())
-            }
-        }
-    }
-
     pub fn get_connected_pool(&self) -> Option<Rc<Pool>> {
-        let pool = self.get_pool_value();
-
-        if let Some(pool) = pool {
-            Some(pool)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_connected_pool_with_name(&self) -> Option<(Rc<Pool>, String)> {
-        let pool = self.get_pool_value();
-        let name = self.get_string_value("CONNECTED_POOL_NAME");
-
-        if let (Some(pool), Some(name)) = (pool, name) {
-            Some((pool, name))
-        } else {
-            None
-        }
+        self.get_pool()
     }
 
     pub fn reset_connected_pool(&self) {
-        self.set_string_value("CONNECTED_POOL_NAME", None);
         self.set_sub_prompt(1, None);
-        self.set_pool_value(None);
+        self.set_pool(None);
     }
 
     pub fn set_context_transaction(&self, request: Option<String>) {

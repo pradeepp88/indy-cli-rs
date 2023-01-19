@@ -32,11 +32,10 @@ pub mod new_command {
 
         let store = ctx.ensure_opened_wallet()?;
 
-        let did = ParamParser::get_opt_str_param("did", params).map_err(error_err!())?;
-        let seed = ParamParser::get_opt_str_param("seed", params).map_err(error_err!())?;
-        let method = ParamParser::get_opt_str_param("method", params).map_err(error_err!())?;
-        let metadata =
-            ParamParser::get_opt_empty_str_param("metadata", params).map_err(error_err!())?;
+        let did = ParamParser::get_opt_str_param("did", params)?;
+        let seed = ParamParser::get_opt_str_param("seed", params)?;
+        let method = ParamParser::get_opt_str_param("method", params)?;
+        let metadata = ParamParser::get_opt_empty_str_param("metadata", params)?;
 
         let (did, vk) = Did::create(&store, did, seed, metadata, method)
             .map_err(|err| println_err!("{}", err.message(None)))?;
@@ -46,11 +45,6 @@ pub mod new_command {
 
         println_succ!("Did \"{}\" has been created with \"{}\" verkey", did, vk);
 
-        // if let Some(metadata) = metadata {
-        //     Did::set_metadata(&store, &did, metadata)
-        //         .map_err(|err| println_err!("{}", err.message(None)))?;
-        // }
-
         trace!("execute <<");
         Ok(())
     }
@@ -59,11 +53,12 @@ pub mod new_command {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::tools::did::DidInfo;
     mod did_new {
         use super::*;
         use crate::{
             commands::{setup, setup_with_wallet, tear_down, tear_down_with_wallet},
-            did::tests::{get_did_info, get_dids, DID_TRUSTEE, SEED_TRUSTEE, VERKEY_TRUSTEE},
+            did::tests::{get_did_info, DID_TRUSTEE, SEED_TRUSTEE, VERKEY_TRUSTEE},
         };
 
         #[test]
@@ -214,5 +209,10 @@ pub mod tests {
 
             tear_down_with_wallet(&ctx);
         }
+    }
+
+    pub fn get_dids(ctx: &CommandContext) -> Vec<DidInfo> {
+        let wallet = ctx.ensure_opened_wallet().unwrap();
+        Did::list(&wallet).unwrap()
     }
 }

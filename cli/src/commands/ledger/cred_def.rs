@@ -42,20 +42,16 @@ pub mod cred_def_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let schema_id = ParamParser::get_str_param("schema_id", params).map_err(error_err!())?;
-        let signature_type =
-            ParamParser::get_str_param("signature_type", params).map_err(error_err!())?;
-        let tag = ParamParser::get_opt_str_param("tag", params)
-            .map_err(error_err!())?
-            .unwrap_or("");
+        let schema_id = ParamParser::get_str_param("schema_id", params)?;
+        let signature_type = ParamParser::get_str_param("signature_type", params)?;
+        let tag = ParamParser::get_opt_str_param("tag", params)?.unwrap_or("");
 
-        let primary = ParamParser::get_object_param("primary", params).map_err(error_err!())?;
-        let revocation =
-            ParamParser::get_opt_object_param("revocation", params).map_err(error_err!())?;
+        let primary = ParamParser::get_object_param("primary", params)?;
+        let revocation = ParamParser::get_opt_object_param("revocation", params)?;
 
         let schema_id = SchemaId::from(schema_id.to_string());
         let id = CredentialDefinitionId::new(&submitter_did, &schema_id, signature_type, tag);
@@ -79,14 +75,8 @@ pub mod cred_def_command {
 
         set_author_agreement(ctx, &mut request)?;
 
-        let (_, response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         handle_transaction_response(response).map(|result| {
             print_transaction_response(
@@ -122,22 +112,19 @@ pub mod get_cred_def_command {
         let submitter_did = ctx.get_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let schema_id = ParamParser::get_str_param("schema_id", params).map_err(error_err!())?;
-        let signature_type =
-            ParamParser::get_str_param("signature_type", params).map_err(error_err!())?;
-        let tag = ParamParser::get_opt_str_param("tag", params)
-            .map_err(error_err!())?
-            .unwrap_or("");
-        let origin = ParamParser::get_did_param("origin", params).map_err(error_err!())?;
+        let schema_id = ParamParser::get_str_param("schema_id", params)?;
+        let signature_type = ParamParser::get_str_param("signature_type", params)?;
+        let tag = ParamParser::get_opt_str_param("tag", params)?.unwrap_or("");
+        let origin = ParamParser::get_did_param("origin", params)?;
 
         let schema_id = SchemaId::from(schema_id.to_string());
         let id = CredentialDefinitionId::new(&origin, &schema_id, signature_type, tag);
 
         let request =
-            Ledger::build_get_cred_def_request(pool.as_deref(), submitter_did.as_ref(), &id)
+            Ledger::build_get_cred_def_request(pool.as_deref(), submitter_did.as_deref(), &id)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
+        let (_, response) = send_read_request!(&ctx, params, &request);
 
         if let Some(result) = response.result.as_ref() {
             if !result["seqNo"].is_i64() {
@@ -167,13 +154,17 @@ pub mod tests {
     use crate::{
         commands::{
             did::tests::{new_did, use_did, DID_MY3, SEED_MY3},
-            setup_with_wallet_and_pool, tear_down_with_wallet_and_pool,
+            setup_with_wallet_and_pool, submit_retry, tear_down_with_wallet_and_pool,
             wallet::tests::{close_wallet, open_wallet},
         },
-        ledger::tests::{
-            ensure_cred_def_added, send_schema, use_new_identity, use_trustee, CRED_DEF_DATA,
-        },
+        ledger::tests::{use_new_identity, use_trustee},
     };
+    use indy_utils::{did::DidValue, Qualifiable};
+    use indy_vdr::ledger::requests::schema::{AttributeNames, Schema, SchemaV1};
+    use std::ops::Deref;
+
+    const CRED_DEF_DATA: &str =
+        r#"{"n":"1","s":"1","rms":"1","r":{"age":"1","name":"1"},"rctxt":"1","z":"1"}"#;
 
     mod cred_def {
         use super::*;
@@ -339,5 +330,45 @@ pub mod tests {
             }
             tear_down_with_wallet_and_pool(&ctx);
         }
+    }
+
+    pub fn send_schema(ctx: &CommandContext, did: &str) -> String {
+        let pool = ctx.get_connected_pool().unwrap();
+        let wallet = ctx.get_opened_wallet().unwrap();
+        let did = DidValue(did.to_string());
+        let name = "cli_gvt";
+        let version = "1.0";
+        let attr_names = ["name"];
+        let id = SchemaId::new(&did, name, version);
+        let schema = Schema::SchemaV1(SchemaV1 {
+            id,
+            name: name.to_string(),
+            version: version.to_string(),
+            attr_names: AttributeNames::from(attr_names.as_slice()),
+            seq_no: None,
+        });
+        let mut schema_request =
+            Ledger::build_schema_request(Some(pool.deref()), &did, schema).unwrap();
+        let schema_response =
+            Ledger::sign_and_submit_request(pool.deref(), &wallet, &did, &mut schema_request)
+                .unwrap();
+        let schema: JsonValue = serde_json::from_str(&schema_response).unwrap();
+        let seq_no = schema["result"]["txnMetadata"]["seqNo"].as_i64().unwrap();
+        seq_no.to_string()
+    }
+
+    pub fn ensure_cred_def_added(
+        ctx: &CommandContext,
+        did: &str,
+        schema_id: &str,
+    ) -> Result<(), ()> {
+        let pool = ctx.get_connected_pool().unwrap();
+        let schema_id = SchemaId::from_str(schema_id).unwrap();
+        let id = CredentialDefinitionId::new(&DidValue(did.to_string()), &schema_id, "CL", "TAG");
+        let request = Ledger::build_get_cred_def_request(Some(&pool), None, &id).unwrap();
+        submit_retry(ctx, &request, |response| {
+            let cred_def: JsonValue = serde_json::from_str(&response).unwrap();
+            cred_def["result"]["seqNo"].as_i64().ok_or(())
+        })
     }
 }

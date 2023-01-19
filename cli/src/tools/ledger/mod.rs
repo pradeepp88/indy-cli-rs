@@ -72,7 +72,7 @@ impl Ledger {
 
         block_on(async {
             let (request_result, _) = perform_ledger_action(
-                pool.value(),
+                &pool.pool,
                 request.req_id.to_string(),
                 request.req_json.to_string(),
                 nodes,
@@ -493,12 +493,12 @@ impl Ledger {
     }
 
     fn _request_builder(pool: Option<&Pool>) -> RequestBuilder {
-        pool.map(|pool| pool.value().get_request_builder())
+        pool.map(|pool| pool.pool.get_request_builder())
             .unwrap_or_else(|| RequestBuilder::new(ProtocolVersion::Node1_4))
     }
 
     async fn _submit_request(request: &PreparedRequest, pool: &Pool) -> CliResult<String> {
-        let (request_result, _) = perform_ledger_request(pool.value(), request).await?;
+        let (request_result, _) = perform_ledger_request(&pool.pool, request).await?;
         match request_result {
             RequestResult::Reply(message) => Ok(message),
             RequestResult::Failed(error) => Err(error.into()),

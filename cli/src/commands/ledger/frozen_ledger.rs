@@ -30,20 +30,14 @@ pub mod ledgers_freeze_command {
         let submitter_did = ctx.ensure_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
 
         let mut request =
             Ledger::build_ledgers_freeze_request(pool.as_deref(), &submitter_did, ledgers_ids?)
                 .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response) = send_write_request!(
-            &ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, response) =
+            send_write_request!(&ctx, params, &mut request, &wallet, &submitter_did);
 
         let result = handle_transaction_response(response)?;
 
@@ -72,7 +66,7 @@ pub mod get_frozen_ledgers_command {
         let request = Ledger::build_get_frozen_ledgers_request(pool.as_deref(), &submitter_did)
             .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response) = send_read_request!(&ctx, params, &request, Some(&submitter_did));
+        let (_, response) = send_read_request!(&ctx, params, &request);
         let handle_response = handle_transaction_response(response)?;
 
         // Flattering ap into vector

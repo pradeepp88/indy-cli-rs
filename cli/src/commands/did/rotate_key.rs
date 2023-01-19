@@ -5,23 +5,15 @@
 */
 use crate::{
     command_executor::{Command, CommandContext, CommandMetadata, CommandParams},
-    ledger::handle_transaction_response,
     params_parser::ParamParser,
-    tools::{
-        did::Did,
-        ledger::{Ledger, Response},
-        pool::Pool,
-        wallet::Wallet,
-    },
+    tools::did::Did,
 };
-use indy_utils::did::DidValue;
 
 pub mod rotate_key_command {
     use super::*;
     use crate::{
         error::CliError,
-        ledger::{handle_transaction_response, set_author_agreement},
-        tools::ledger::Response,
+        ledger::{get_current_verkey, send_nym},
     };
     use indy_vdr::common::error::VdrErrorKind;
 
@@ -40,19 +32,17 @@ pub mod rotate_key_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let seed = ParamParser::get_opt_str_param("seed", params).map_err(error_err!())?;
+        let seed = ParamParser::get_opt_str_param("seed", params)?;
 
-        let resume = ParamParser::get_opt_bool_param("resume", params)
-            .map_err(error_err!())?
-            .unwrap_or(false);
+        let resume = ParamParser::get_opt_bool_param("resume", params)?.unwrap_or(false);
 
         let did = ctx.ensure_active_did()?;
-        let pool = ctx.get_connected_pool_with_name();
+        let pool = ctx.get_connected_pool();
         let store = ctx.ensure_opened_wallet()?;
 
         // get verkey from ledger
         let ledger_verkey = match pool {
-            Some((pool, pool_name)) => _get_current_verkey(&pool, &pool_name, &store, &did)?,
+            Some(pool) => get_current_verkey(&pool, &store, &did)?,
             None => None,
         };
 
@@ -114,34 +104,21 @@ pub mod rotate_key_command {
 
         if update_ledger && is_did_on_the_ledger {
             let pool = ctx.ensure_connected_pool()?;
-            let pool_name = ctx.ensure_connected_pool_name()?;
-            let mut request =
-                Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None)
-                    .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?;
 
-            set_author_agreement(ctx, &mut request)?;
-
-            let response_json = Ledger::sign_and_submit_request(&pool, &store, &did, &mut request)
-                .map_err(|err| match err {
-                    CliError::VdrError(ref vdr_err) => match vdr_err.kind() {
-                        VdrErrorKind::PoolTimeout => {
-                            println_err!("Transaction response has not been received");
-                            println_err!("Use command `did rotate-key resume=true` to complete");
-                        }
-                        _ => {
-                            println_err!("{}", err.message(Some(&pool_name)));
-                        }
-                    },
-                    _ => {
-                        println_err!("{}", err.message(Some(&pool_name)));
+            send_nym(&ctx, &pool, &store, &did, &new_verkey).map_err(|err| match err {
+                CliError::VdrError(ref vdr_err) => match vdr_err.kind() {
+                    VdrErrorKind::PoolTimeout => {
+                        println_err!("Transaction response has not been received");
+                        println_err!("Use command `did rotate-key resume=true` to complete");
                     }
-                })?;
-
-            let response: Response<serde_json::Value> =
-                serde_json::from_str::<Response<serde_json::Value>>(&response_json)
-                    .map_err(|err| println_err!("Invalid data has been received: {:?}", err))?;
-
-            handle_transaction_response(response)?;
+                    _ => {
+                        println_err!("{}", err.message(Some(&pool.name)));
+                    }
+                },
+                _ => {
+                    println_err!("{}", err.message(Some(&pool.name)));
+                }
+            })?;
         };
 
         Did::replace_keys_apply(&store, &did)
@@ -158,26 +135,6 @@ pub mod rotate_key_command {
     }
 }
 
-fn _get_current_verkey(
-    pool: &Pool,
-    pool_name: &str,
-    store: &Wallet,
-    did: &DidValue,
-) -> Result<Option<String>, ()> {
-    //TODO: There nym is requested. Due to freshness issues response might be stale or outdated. Something should be done with it
-    let response_json = Ledger::build_get_nym_request(Some(pool), Some(did), did)
-        .and_then(|mut request| Ledger::sign_and_submit_request(pool, store, did, &mut request))
-        .map_err(|err| println_err!("{}", err.message(Some(pool_name))))?;
-    let response: Response<serde_json::Value> =
-        serde_json::from_str::<Response<serde_json::Value>>(&response_json)
-            .map_err(|err| println_err!("Invalid data has been received: {:?}", err))?;
-    let result = handle_transaction_response(response)?;
-    let data = serde_json::from_str::<serde_json::Value>(&result["data"].as_str().unwrap_or("{}"))
-        .map_err(|_| println_err!("Wrong data has been received"))?;
-    let verkey = data["verkey"].as_str().map(String::from);
-    Ok(verkey)
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -192,8 +149,10 @@ pub mod tests {
             },
             did::tests::{get_did_info, new_did, use_did, DID_TRUSTEE, SEED_TRUSTEE},
             pool::tests::{create_and_connect_pool, disconnect_and_delete_pool},
+            tools::ledger::Ledger,
             wallet::tests::{close_and_delete_wallet, create_and_open_wallet},
         };
+        use indy_utils::did::DidValue;
 
         fn ensure_nym_written(ctx: &CommandContext, did: &str, verkey: &str) {
             let pool = ctx.get_connected_pool().unwrap();

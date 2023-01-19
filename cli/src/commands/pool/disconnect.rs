@@ -17,23 +17,22 @@ pub mod disconnect_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ctx.ensure_connected_pool()?;
-        let name = ctx.ensure_connected_pool_name()?;
 
-        close_pool(ctx, &pool, &name)?;
+        close_pool(ctx, &pool)?;
 
         trace!("execute <<");
         Ok(())
     }
 }
 
-pub fn close_pool(ctx: &CommandContext, pool: &Pool, name: &str) -> Result<(), ()> {
-    Pool::close(pool)
+pub fn close_pool(ctx: &CommandContext, pool: &Pool) -> Result<(), ()> {
+    pool.close()
         .map(|_| {
             ctx.reset_connected_pool();
             ctx.set_transaction_author_info(None);
-            println_succ!("Pool \"{}\" has been disconnected", name)
+            println_succ!("Pool \"{}\" has been disconnected", pool.name)
         })
-        .map_err(|err| println_err!("{}", err.message(Some(&name))))
+        .map_err(|err| println_err!("{}", err.message(Some(&pool.name))))
 }
 
 #[cfg(test)]

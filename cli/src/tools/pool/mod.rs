@@ -17,13 +17,12 @@ use indy_vdr::{
 
 pub mod directory;
 
-pub struct Pool(LocalPool);
+pub struct Pool {
+    pub pool: LocalPool,
+    pub name: String,
+}
 
 impl Pool {
-    pub fn value(&self) -> &LocalPool {
-        &self.0
-    }
-
     pub fn create(name: &str, config: &PoolConfig) -> CliResult<()> {
         PoolDirectory::store_pool_config(name, config).map_err(CliError::from)
     }
@@ -51,25 +50,33 @@ impl Pool {
             .node_weights(weight_nodes)
             .into_local()?;
 
-        Ok(Pool(pool))
+        Ok(Pool {
+            pool,
+            name: name.to_string(),
+        })
     }
 
-    pub fn refresh(&self, name: &str) -> CliResult<Option<Pool>> {
-        let pool = self.value();
-        let (transactions, _) = block_on(async move { perform_refresh(pool).await })?;
+    pub fn refresh(&self) -> CliResult<Option<Pool>> {
+        let (transactions, _) = block_on(async move { perform_refresh(&self.pool).await })?;
 
         match transactions {
             Some(new_transactions) if new_transactions.len() > 0 => {
-                let mut transactions = PoolTransactions::from(pool.get_merkle_tree());
+                let mut transactions = PoolTransactions::from(self.pool.get_merkle_tree());
                 transactions.extend_from_json(new_transactions)?;
 
-                let pool = PoolBuilder::from(pool.get_config().to_owned())
+                let pool = PoolBuilder::from(self.pool.get_config().to_owned())
                     .transactions(transactions)?
                     .into_local()?;
 
-                PoolDirectory::store_pool_transactions(name, &pool.get_json_transactions()?)?;
+                PoolDirectory::store_pool_transactions(
+                    &self.name,
+                    &self.pool.get_json_transactions()?,
+                )?;
 
-                Ok(Some(Pool(pool)))
+                Ok(Some(Pool {
+                    pool,
+                    name: self.name.to_string(),
+                }))
             }
             _ => Ok(None),
         }

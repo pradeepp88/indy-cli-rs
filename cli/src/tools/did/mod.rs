@@ -200,7 +200,7 @@ impl Did {
             .map_err(CliError::from)
     }
 
-    pub fn qualify(store: &Wallet, did: &DidValue, method: &str) -> CliResult<String> {
+    pub fn qualify(store: &Wallet, did: &DidValue, method: &str) -> CliResult<DidValue> {
         block_on(async {
             let (entry, did_info) = Self::fetch_record(store, &did.to_string(), true)
                 .await?
@@ -210,13 +210,12 @@ impl Did {
 
             let qualified_did = did
                 .to_qualified(method)
-                .map(|did| did.to_string())
                 .map_err(|_| CliError::InvalidInput(format!("Invalid DID {} provided.", did)))?;
 
             Self::remove(store, &did.to_string()).await?;
 
             let did_info = DidInfo {
-                did: qualified_did.clone(),
+                did: qualified_did.to_string(),
                 ..did_info
             };
 

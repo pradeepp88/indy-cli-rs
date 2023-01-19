@@ -20,7 +20,7 @@ pub mod init_logger_command {
     fn execute(_ctx: &CommandContext, params: &CommandParams) -> CommandResult {
         trace!("execute >> params: {:?}", params);
 
-        let file = ParamParser::get_str_param("file", params).map_err(error_err!())?;
+        let file = ParamParser::get_str_param("file", params)?;
 
         match logger::IndyCliLogger::init(&file) {
             Ok(()) => println_succ!(

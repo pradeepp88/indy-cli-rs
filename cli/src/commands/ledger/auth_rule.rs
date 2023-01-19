@@ -63,18 +63,16 @@ pub mod auth_rule_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let txn_type = ParamParser::get_str_param("txn_type", params).map_err(error_err!())?;
-        let action = ParamParser::get_str_param("action", params).map_err(error_err!())?;
-        let field = ParamParser::get_str_param("field", params).map_err(error_err!())?;
-        let old_value =
-            ParamParser::get_opt_str_param("old_value", params).map_err(error_err!())?;
-        let new_value =
-            ParamParser::get_opt_str_param("new_value", params).map_err(error_err!())?;
-        let constraint = ParamParser::get_str_param("constraint", params).map_err(error_err!())?;
+        let txn_type = ParamParser::get_str_param("txn_type", params)?;
+        let action = ParamParser::get_str_param("action", params)?;
+        let field = ParamParser::get_str_param("field", params)?;
+        let old_value = ParamParser::get_opt_str_param("old_value", params)?;
+        let new_value = ParamParser::get_opt_str_param("new_value", params)?;
+        let constraint = ParamParser::get_str_param("constraint", params)?;
 
         let txn_type = txn_name_to_code(txn_type)
             .ok_or_else(|| println_err!("Unsupported ledger transaction."))?;
@@ -91,14 +89,8 @@ pub mod auth_rule_command {
         )
         .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, mut response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, mut response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         if let Some(result) = response.result.as_mut() {
             result["txn"]["data"]["auth_type"] =
@@ -144,23 +136,17 @@ pub mod auth_rules_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let store = ctx.ensure_opened_wallet()?;
+        let wallet = ctx.ensure_opened_wallet()?;
         let submitter_did = ctx.ensure_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let rules = ParamParser::get_str_param("rules", params).map_err(error_err!())?;
+        let rules = ParamParser::get_str_param("rules", params)?;
 
         let mut request = Ledger::build_auth_rules_request(pool.as_deref(), &submitter_did, &rules)
             .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response): (String, Response<JsonValue>) = send_write_request!(
-            ctx,
-            params,
-            &mut request,
-            &store,
-            &wallet_name,
-            &submitter_did
-        );
+        let (_, response): (String, Response<JsonValue>) =
+            send_write_request!(ctx, params, &mut request, &wallet, &submitter_did);
 
         let result = handle_transaction_response(response)?;
         println!("result {:?}", result);
@@ -197,17 +183,15 @@ pub mod get_auth_rule_command {
         let submitter_did = ctx.get_active_did()?;
         let pool = ctx.get_connected_pool();
 
-        let auth_type = ParamParser::get_opt_str_param("txn_type", params).map_err(error_err!())?;
-        let auth_action = ParamParser::get_opt_str_param("action", params).map_err(error_err!())?;
-        let field = ParamParser::get_opt_str_param("field", params).map_err(error_err!())?;
-        let old_value =
-            ParamParser::get_opt_str_param("old_value", params).map_err(error_err!())?;
-        let new_value =
-            ParamParser::get_opt_str_param("new_value", params).map_err(error_err!())?;
+        let auth_type = ParamParser::get_opt_str_param("txn_type", params)?;
+        let auth_action = ParamParser::get_opt_str_param("action", params)?;
+        let field = ParamParser::get_opt_str_param("field", params)?;
+        let old_value = ParamParser::get_opt_str_param("old_value", params)?;
+        let new_value = ParamParser::get_opt_str_param("new_value", params)?;
 
         let request = Ledger::build_get_auth_rule_request(
             pool.as_deref(),
-            submitter_did.as_ref(),
+            submitter_did.as_deref(),
             auth_type,
             auth_action,
             field,
@@ -216,7 +200,7 @@ pub mod get_auth_rule_command {
         )
         .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let (_, response) = send_read_request!(&ctx, params, &request, submitter_did.as_ref());
+        let (_, response) = send_read_request!(&ctx, params, &request);
 
         let result = handle_transaction_response(response)?;
 

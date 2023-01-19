@@ -28,15 +28,15 @@ pub mod detach_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx: {:?} params {:?}", ctx, secret!(params));
 
-        let id = ParamParser::get_str_param("name", params).map_err(error_err!())?;
+        let id = ParamParser::get_str_param("name", params)?;
 
         if !WalletDirectory::is_wallet_config_exist(id) {
             println_err!("Wallet \"{}\" isn't attached to CLI", id);
             return Err(());
         }
 
-        if let Some((_, name)) = ctx.get_opened_wallet() {
-            if id == name {
+        if let Some(wallet) = ctx.get_opened_wallet() {
+            if wallet.name == id {
                 println_err!("Wallet \"{}\" is opened", id);
                 return Err(());
             }

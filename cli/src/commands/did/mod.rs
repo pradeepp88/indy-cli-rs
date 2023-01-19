@@ -53,11 +53,6 @@ pub mod tests {
         Did::get(&wallet, &did).unwrap()
     }
 
-    pub fn get_dids(ctx: &CommandContext) -> Vec<DidInfo> {
-        let wallet = ctx.ensure_opened_wallet().unwrap();
-        Did::list(&wallet).unwrap()
-    }
-
     pub fn new_did(ctx: &CommandContext, seed: &str) {
         {
             let cmd = new_command::new();

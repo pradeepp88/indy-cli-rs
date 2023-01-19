@@ -31,8 +31,8 @@ pub mod qualify_command {
         trace!("execute >> ctx {:?}, params {:?}", ctx, params);
 
         let wallet = ctx.ensure_opened_wallet()?;
-        let did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
-        let method = ParamParser::get_str_param("method", params).map_err(error_err!())?;
+        let did = ParamParser::get_did_param("did", params)?;
+        let method = ParamParser::get_str_param("method", params)?;
 
         let full_qualified_did = Did::qualify(&wallet, &did, &method)
             .map_err(|err| println_err!("{}", err.message(None)))?;
@@ -40,8 +40,8 @@ pub mod qualify_command {
         println_succ!("Fully qualified DID \"{}\"", full_qualified_did);
 
         if let Some(active_did) = ctx.get_active_did()? {
-            if active_did == did {
-                ctx.set_active_did(full_qualified_did.to_owned());
+            if *active_did == did {
+                ctx.set_active_did(full_qualified_did);
                 println_succ!("Target DID is the same as CLI active. Active DID has been updated");
             }
         }

@@ -27,12 +27,10 @@ pub mod attach_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
-        let id = ParamParser::get_str_param("name", params).map_err(error_err!())?;
-        let storage_type = ParamParser::get_opt_str_param("storage_type", params)
-            .map_err(error_err!())?
-            .unwrap_or("default");
-        let storage_config =
-            ParamParser::get_opt_object_param("storage_config", params).map_err(error_err!())?;
+        let id = ParamParser::get_str_param("name", params)?;
+        let storage_type =
+            ParamParser::get_opt_str_param("storage_type", params)?.unwrap_or("default");
+        let storage_config = ParamParser::get_opt_object_param("storage_config", params)?;
 
         if WalletDirectory::is_wallet_config_exist(id) {
             println_err!("Wallet \"{}\" is already attached to CLI", id);

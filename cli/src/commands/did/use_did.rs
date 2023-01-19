@@ -26,14 +26,14 @@ pub mod use_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?}, params {:?}", ctx, params);
 
-        let did = ParamParser::get_did_param("did", params).map_err(error_err!())?;
+        let did = ParamParser::get_did_param("did", params)?;
 
         let store = ctx.ensure_opened_wallet()?;
 
         Did::get(&store, &did).map_err(|err| println_err!("{}", err.message(None)))?;
 
-        ctx.set_active_did(did.to_string());
         println_succ!("Did \"{}\" has been set as active", did);
+        ctx.set_active_did(did);
 
         trace!("execute <<");
         Ok(())

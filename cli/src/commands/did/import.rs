@@ -45,7 +45,7 @@ pub mod import_command {
 
         let store = ctx.ensure_opened_wallet()?;
 
-        let path = ParamParser::get_str_param("file", params).map_err(error_err!())?;
+        let path = ParamParser::get_str_param("file", params)?;
 
         let data = read_file(path)
             .map_err(|_| println_err!("Unable to read DID import config from the provided file"))?;

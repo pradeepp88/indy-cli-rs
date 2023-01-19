@@ -16,8 +16,8 @@ pub mod close_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        if let Some((store, id)) = ctx.take_opened_wallet() {
-            close_wallet(ctx, store, &id)?;
+        if let Some(wallet) = ctx.take_opened_wallet() {
+            close_wallet(ctx, wallet)?;
         } else {
             println_err!("There is no opened wallet now");
             return Err(());
@@ -28,15 +28,16 @@ pub mod close_command {
     }
 }
 
-pub fn close_wallet(ctx: &CommandContext, store: Wallet, name: &str) -> Result<(), ()> {
-    store
+pub fn close_wallet(ctx: &CommandContext, wallet: Wallet) -> Result<(), ()> {
+    let name = wallet.name.clone();
+    wallet
         .close()
         .map(|_| {
-            ctx.reset_wallet();
+            ctx.reset_opened_wallet();
             ctx.reset_active_did();
             println_succ!("Wallet \"{}\" has been closed", name);
         })
-        .map_err(|err| println_err!("{}", err.message(Some(name))))
+        .map_err(|err| println_err!("{}", err.message(Some(&name))))
 }
 
 #[cfg(test)]

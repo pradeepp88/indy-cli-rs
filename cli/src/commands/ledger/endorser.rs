@@ -33,17 +33,16 @@ pub mod endorse_transaction_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let wallet = ctx.ensure_opened_wallet()?;
-        let wallet_name = ctx.ensure_opened_wallet_name()?;
         let submitter_did = ctx.ensure_active_did()?;
 
-        let param_txn = ParamParser::get_opt_str_param("txn", params).map_err(error_err!())?;
+        let param_txn = ParamParser::get_opt_str_param("txn", params)?;
 
         let mut request = get_transaction_to_use!(ctx, param_txn);
 
         Ledger::multi_sign_request(&wallet, &submitter_did, &mut request)
-            .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
+            .map_err(|err| println_err!("{}", err.message(Some(&wallet.name))))?;
 
-        let (_, response) = send_request!(&ctx, params, &request, None, Some(&submitter_did), true);
+        let (_, response) = send_request!(&ctx, params, &request, true);
 
         let (metadata_headers, metadata, data) = handle_transaction_response(response)
             .and_then(|result| parse_transaction_response(result))?;

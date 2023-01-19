@@ -6,7 +6,6 @@
 use crate::{
     command_executor::{Command, CommandContext, CommandMetadata, CommandParams},
     params_parser::ParamParser,
-    tools::wallet::Wallet,
 };
 
 pub mod export_command {
@@ -29,14 +28,11 @@ pub mod export_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, secret!(params));
 
         let wallet = ctx.ensure_opened_wallet()?;
-        let wallet_name = ctx.ensure_opened_wallet_name()?;
 
-        let export_path =
-            ParamParser::get_str_param("export_path", params).map_err(error_err!())?;
-        let export_key = ParamParser::get_str_param("export_key", params).map_err(error_err!())?;
+        let export_path = ParamParser::get_str_param("export_path", params)?;
+        let export_key = ParamParser::get_str_param("export_key", params)?;
         let export_key_derivation_method =
-            ParamParser::get_opt_str_param("export_key_derivation_method", params)
-                .map_err(error_err!())?;
+            ParamParser::get_opt_str_param("export_key_derivation_method", params)?;
 
         let export_config = ExportConfig {
             path: export_path.to_string(),
@@ -46,16 +42,17 @@ pub mod export_command {
 
         trace!(
             "Wallet::export_wallet try: wallet_name {}, export_path {}",
-            wallet_name,
+            wallet.name,
             export_path
         );
 
-        Wallet::export(&wallet, &export_config)
-            .map_err(|err| println_err!("{}", err.message(Some(&wallet_name))))?;
+        wallet
+            .export(&export_config)
+            .map_err(|err| println_err!("{}", err.message(Some(&wallet.name))))?;
 
         println_succ!(
             "Wallet \"{}\" has been exported to the file \"{}\"",
-            wallet_name,
+            wallet.name,
             export_path
         );
 

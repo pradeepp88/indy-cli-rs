@@ -29,7 +29,10 @@ use directory::{WalletConfig, WalletDirectory};
 use serde_json::Value as JsonValue;
 
 #[derive(Debug)]
-pub struct Wallet(AnyStore);
+pub struct Wallet {
+    pub name: String,
+    pub store: AnyStore,
+}
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Credentials {
@@ -55,10 +58,6 @@ pub struct ImportConfig {
 }
 
 impl Wallet {
-    fn value(&self) -> &AnyStore {
-        &self.0
-    }
-
     pub fn create(config: &WalletConfig, credentials: &Credentials) -> CliResult<()> {
         if WalletDirectory::is_wallet_config_exist(&config.id) {
             return Err(CliError::Duplicate(format!(
@@ -115,12 +114,15 @@ impl Wallet {
                 store.rekey(rekey_method, rekey).await?;
             }
 
-            Ok(Wallet(store))
+            Ok(Wallet {
+                store,
+                name: config.id.to_string(),
+            })
         })
     }
 
     pub fn close(self) -> CliResult<()> {
-        block_on(async move { self.0.close().await.map_err(CliError::from) })
+        block_on(async move { self.store.close().await.map_err(CliError::from) })
     }
 
     pub fn delete(config: &WalletConfig, credentials: &Credentials) -> CliResult<bool> {
@@ -147,7 +149,7 @@ impl Wallet {
         WalletDirectory::list_wallets()
     }
 
-    pub fn export(store: &Wallet, export_config: &ExportConfig) -> CliResult<()> {
+    pub fn export(&self, export_config: &ExportConfig) -> CliResult<()> {
         let backup_config = WalletConfig {
             id: WalletBackup::get_id(&export_config.path),
             storage_type: StorageType::Sqlite.to_str().to_string(),
@@ -180,7 +182,7 @@ impl Wallet {
                 .await
                 .map_err(CliError::from)?;
 
-            Self::copy_records(store.value(), &backup_store).await?;
+            Self::copy_records(&self.store, &backup_store).await?;
 
             backup_store.close().await?;
 
@@ -316,7 +318,7 @@ impl Wallet {
         tags: Option<&[EntryTag]>,
         new: bool,
     ) -> CliResult<()> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         if new {
             session.insert(category, id, value, tags, None).await?
         } else {
@@ -327,7 +329,7 @@ impl Wallet {
     }
 
     pub async fn fetch_all_record(&self, category: &str) -> CliResult<Vec<Entry>> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         let records = session.fetch_all(category, None, None, false).await?;
         session.commit().await?;
         Ok(records)
@@ -339,21 +341,21 @@ impl Wallet {
         id: &str,
         for_update: bool,
     ) -> CliResult<Option<Entry>> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         let record = session.fetch(category, &id, for_update).await?;
         session.commit().await?;
         Ok(record)
     }
 
     pub async fn remove_record(&self, category: &str, id: &str) -> CliResult<()> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         session.remove(category, id).await.map_err(CliError::from)?;
         session.commit().await?;
         Ok(())
     }
 
     pub async fn insert_key(&self, id: &str, key: &Key, metadata: Option<&str>) -> CliResult<()> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         session
             .insert_key(id, key.value(), metadata, None, None)
             .await?;
@@ -362,7 +364,7 @@ impl Wallet {
     }
 
     pub async fn fetch_key(&self, id: &str) -> CliResult<LocalKey> {
-        let mut session = self.value().session(None).await?;
+        let mut session = self.store.session(None).await?;
         let key = session
             .fetch_key(id, false)
             .await?

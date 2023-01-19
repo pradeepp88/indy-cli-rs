@@ -4,6 +4,7 @@ use atty;
 macro_rules! println_err {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
+            error!($($arg)*);
             println!("{}", ansi_term::Color::Red.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
@@ -15,6 +16,7 @@ macro_rules! println_err {
 macro_rules! println_succ {
     ($($arg:tt)*) => (
         if $crate::utils::term::is_term() {
+            trace!($($arg)*);
             println!("{}", ansi_term::Color::Green.bold().paint(format!($($arg)*)))
         } else {
             println!($($arg)*)
@@ -28,6 +30,7 @@ macro_rules! println_warn {
         if $crate::utils::term::is_term() {
             println!("{}", ansi_term::Color::Yellow.bold().paint(format!($($arg)*)))
         } else {
+            trace!($($arg)*);
             println!($($arg)*)
         }
     )
@@ -37,17 +40,12 @@ macro_rules! println_warn {
 macro_rules! println_acc {
     ($($arg:tt)*) => (
        if $crate::utils::term::is_term() {
+            trace!($($arg)*);
            println!("{}", ansi_term::Style::new().bold().paint(format!($($arg)*)))
        } else {
            println!($($arg)*)
        }
     )
-}
-
-// TODO: move to more relevant place
-#[macro_export]
-macro_rules! map_println_err {
-    ($($arg:tt)*) => ( |err| println_err!("{}: {}", $($arg)*, err) )
 }
 
 pub fn is_term() -> bool {

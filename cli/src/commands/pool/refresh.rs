@@ -18,12 +18,11 @@ pub mod refresh_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ctx.ensure_connected_pool()?;
-        let pool_name = ctx.ensure_connected_pool_name()?;
 
-        pool.refresh(&pool_name)
+        pool.refresh()
             .map_err(|err| println_err!("Unable to refresh pool. Reason: {}", err.message(None)))?;
 
-        println_succ!("Pool \"{}\"  has been refreshed", pool_name);
+        println_succ!("Pool \"{}\"  has been refreshed", pool.name);
 
         trace!("execute <<");
         Ok(())

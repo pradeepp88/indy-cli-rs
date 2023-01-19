@@ -23,8 +23,7 @@ pub mod set_protocol_version_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let protocol_version = ParamParser::get_number_param::<usize>("protocol-version", params)
-            .map_err(error_err!())?;
+        let protocol_version = ParamParser::get_number_param::<usize>("protocol-version", params)?;
 
         ctx.set_pool_protocol_version(protocol_version);
         println_succ!("Protocol Version has been set: \"{}\".", protocol_version);

@@ -29,12 +29,12 @@ pub mod delete_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let name = ParamParser::get_str_param("name", params).map_err(error_err!())?;
+        let name = ParamParser::get_str_param("name", params)?;
 
         trace!(r#"Pool::delete try: name {}"#, name);
 
-        if let Some((pool, name)) = ctx.get_connected_pool_with_name() {
-            close_pool(ctx, &pool, &name)?;
+        if let Some(pool) = ctx.get_connected_pool() {
+            close_pool(ctx, &pool)?;
         }
 
         Pool::delete(name).map_err(|err| println_err!("{}", err.message(Some(&name))))?;

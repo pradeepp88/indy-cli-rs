@@ -52,20 +52,16 @@ pub mod connect_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let name = ParamParser::get_str_param("name", params).map_err(error_err!())?;
+        let name = ParamParser::get_str_param("name", params)?;
         let protocol_version =
-            ParamParser::get_opt_number_param::<usize>("protocol-version", params)
-                .map_err(error_err!())?
+            ParamParser::get_opt_number_param::<usize>("protocol-version", params)?
                 .unwrap_or(ctx.get_pool_protocol_version());
-        let timeout =
-            ParamParser::get_opt_number_param::<i64>("timeout", params).map_err(error_err!())?;
-        let extended_timeout = ParamParser::get_opt_number_param::<i64>("extended-timeout", params)
-            .map_err(error_err!())?;
-        let pre_ordered_nodes = ParamParser::get_opt_str_array_param("pre-ordered-nodes", params)
-            .map_err(error_err!())?;
+        let timeout = ParamParser::get_opt_number_param::<i64>("timeout", params)?;
+        let extended_timeout =
+            ParamParser::get_opt_number_param::<i64>("extended-timeout", params)?;
+        let pre_ordered_nodes = ParamParser::get_opt_str_array_param("pre-ordered-nodes", params)?;
         let number_read_nodes =
-            ParamParser::get_opt_number_param::<usize>("number-read-nodes", params)
-                .map_err(error_err!())?;
+            ParamParser::get_opt_number_param::<usize>("number-read-nodes", params)?;
         let protocol_version = ProtocolVersion::from_id(protocol_version as i64).map_err(|_| {
             println_err!("Unexpected Pool protocol version \"{}\".", protocol_version)
         })?;
@@ -79,14 +75,14 @@ pub mod connect_command {
             ..PoolConfig::default()
         };
 
-        if let Some((pool, name)) = ctx.get_connected_pool_with_name() {
-            close_pool(ctx, &pool, &name)?;
+        if let Some(pool) = ctx.get_connected_pool() {
+            close_pool(ctx, &pool)?;
         }
 
         let pool = Pool::open(name, config, pre_ordered_nodes)
             .map_err(|err| println_err!("{}", err.message(Some(&name))))?;
 
-        ctx.set_connected_pool((pool, name.to_owned()));
+        ctx.set_connected_pool(pool);
         println_succ!("Pool \"{}\" has been connected", name);
 
         let pool = ctx.ensure_connected_pool()?;
@@ -99,8 +95,8 @@ pub mod connect_command {
     pub fn cleanup(ctx: &CommandContext) {
         trace!("cleanup >> ctx {:?}", ctx);
 
-        if let Some((pool, name)) = ctx.get_connected_pool_with_name() {
-            close_pool(ctx, &pool, &name).ok();
+        if let Some(pool) = ctx.get_connected_pool() {
+            close_pool(ctx, &pool).ok();
         }
 
         trace!("cleanup <<");

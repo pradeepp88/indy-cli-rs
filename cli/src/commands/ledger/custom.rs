@@ -28,12 +28,9 @@ pub mod custom_command {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
         let pool = ctx.ensure_connected_pool()?;
-        let pool_name = ctx.ensure_connected_pool_name()?;
 
-        let txn = ParamParser::get_str_param("txn", params).map_err(error_err!())?;
-        let sign = ParamParser::get_opt_bool_param("sign", params)
-            .map_err(error_err!())?
-            .unwrap_or(false);
+        let txn = ParamParser::get_str_param("txn", params)?;
+        let sign = ParamParser::get_opt_bool_param("sign", params)?.unwrap_or(false);
 
         let mut transaction = txn.to_string();
 
@@ -57,7 +54,7 @@ pub mod custom_command {
                 None => {
                     println_err!("There is not a transaction stored into CLI context.");
                     println!("You either need to load transaction using `ledger load-transaction`, or \
-                        build a transaction (with passing a `send=false`) to store it into CLI context.");
+                        build a transaction (with passing a `send=false`) to wallet it into CLI context.");
                     return Err(());
                 }
             }
@@ -67,13 +64,13 @@ pub mod custom_command {
             .map_err(|_| println_err!("Invalid formatted transaction provided."))?;
 
         let response_json = if sign {
-            let store = ctx.ensure_opened_wallet()?;
+            let wallet = ctx.ensure_opened_wallet()?;
             let submitter_did = ctx.ensure_active_did()?;
-            Ledger::sign_and_submit_request(&pool, &store, &submitter_did, &mut transaction)
-                .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?
+            Ledger::sign_and_submit_request(&pool, &wallet, &submitter_did, &mut transaction)
+                .map_err(|err| println_err!("{}", err.message(Some(&pool.name))))?
         } else {
             Ledger::submit_request(&pool, &transaction)
-                .map_err(|err| println_err!("{}", err.message(Some(&pool_name))))?
+                .map_err(|err| println_err!("{}", err.message(Some(&pool.name))))?
         };
 
         let response = serde_json::from_str::<Response<JsonValue>>(&response_json)

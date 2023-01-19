@@ -51,7 +51,7 @@ pub mod list_command {
 
 pub fn did_list(ctx: &CommandContext) -> Vec<String> {
     ctx.get_opened_wallet()
-        .and_then(|(store, _)| Did::list(&store).ok())
+        .and_then(|wallet| Did::list(&wallet).ok())
         .unwrap_or(vec![])
         .into_iter()
         .map(|did| did.did)

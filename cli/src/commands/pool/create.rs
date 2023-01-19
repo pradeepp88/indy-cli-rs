@@ -25,9 +25,8 @@ pub mod create_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        let name = ParamParser::get_str_param("name", params).map_err(error_err!())?;
-        let gen_txn_file =
-            ParamParser::get_str_param("gen_txn_file", params).map_err(error_err!())?;
+        let name = ParamParser::get_str_param("name", params)?;
+        let gen_txn_file = ParamParser::get_str_param("gen_txn_file", params)?;
 
         trace!(
             r#"Pool::create_pool_ledger_config try: name {}, gen_txn_file {:?}"#,
