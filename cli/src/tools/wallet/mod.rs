@@ -119,8 +119,8 @@ impl Wallet {
         })
     }
 
-    pub fn close(store: &Wallet) -> CliResult<()> {
-        block_on(async move { store.value().close().await.map_err(CliError::from) })
+    pub fn close(self) -> CliResult<()> {
+        block_on(async move { self.0.close().await.map_err(CliError::from) })
     }
 
     pub fn delete(config: &WalletConfig, credentials: &Credentials) -> CliResult<bool> {
@@ -318,24 +318,19 @@ impl Wallet {
     ) -> CliResult<()> {
         let mut session = self.value().session(None).await?;
         if new {
-            session
-                .insert(category, id, value, tags, None)
-                .await
-                .map_err(CliError::from)
+            session.insert(category, id, value, tags, None).await?
         } else {
-            session
-                .replace(category, id, value, tags, None)
-                .await
-                .map_err(CliError::from)
+            session.replace(category, id, value, tags, None).await?
         }
+        session.commit().await?;
+        Ok(())
     }
 
     pub async fn fetch_all_record(&self, category: &str) -> CliResult<Vec<Entry>> {
         let mut session = self.value().session(None).await?;
-        session
-            .fetch_all(category, None, None, false)
-            .await
-            .map_err(CliError::from)
+        let records = session.fetch_all(category, None, None, false).await?;
+        session.commit().await?;
+        Ok(records)
     }
 
     pub async fn fetch_record(
@@ -345,32 +340,35 @@ impl Wallet {
         for_update: bool,
     ) -> CliResult<Option<Entry>> {
         let mut session = self.value().session(None).await?;
-        session
-            .fetch(category, &id, for_update)
-            .await
-            .map_err(CliError::from)
+        let record = session.fetch(category, &id, for_update).await?;
+        session.commit().await?;
+        Ok(record)
     }
 
     pub async fn remove_record(&self, category: &str, id: &str) -> CliResult<()> {
         let mut session = self.value().session(None).await?;
-        session.remove(category, id).await.map_err(CliError::from)
+        session.remove(category, id).await.map_err(CliError::from)?;
+        session.commit().await?;
+        Ok(())
     }
 
     pub async fn insert_key(&self, id: &str, key: &Key, metadata: Option<&str>) -> CliResult<()> {
         let mut session = self.value().session(None).await?;
         session
             .insert_key(id, key.value(), metadata, None, None)
-            .await
-            .map_err(CliError::from)
+            .await?;
+        session.commit().await?;
+        Ok(())
     }
 
     pub async fn fetch_key(&self, id: &str) -> CliResult<LocalKey> {
         let mut session = self.value().session(None).await?;
-        session
+        let key = session
             .fetch_key(id, false)
             .await?
             .ok_or_else(|| CliError::NotFound(format!("Key {} does not exits in the wallet!", id)))?
-            .load_local_key()
-            .map_err(CliError::from)
+            .load_local_key()?;
+        session.commit().await?;
+        Ok(key)
     }
 }

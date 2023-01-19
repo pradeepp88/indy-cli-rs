@@ -92,6 +92,18 @@ impl CommandContext {
         }
     }
 
+    pub fn take_opened_wallet(&self) -> Option<(Wallet, String)> {
+        let wallet = self.take_wallet_value();
+        let name = self.get_string_value("OPENED_WALLET_NAME");
+
+        if let (Some(wallet), Some(name)) = (wallet, name) {
+            let wallet = Rc::try_unwrap(wallet).unwrap();
+            Some((wallet, name))
+        } else {
+            None
+        }
+    }
+
     pub fn reset_wallet(&self) {
         self.set_wallet_value(None);
         self.set_string_value("OPENED_WALLET_NAME", None);

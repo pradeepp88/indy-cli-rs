@@ -49,8 +49,8 @@ pub mod delete_command {
             storage_credentials,
         };
 
-        if let Some((store, id)) = ctx.get_opened_wallet() {
-            close_wallet(ctx, &store, &id)?;
+        if let Some((store, id)) = ctx.take_opened_wallet() {
+            close_wallet(ctx, store, &id)?;
         }
 
         Wallet::delete(&config, &credentials)

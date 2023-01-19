@@ -314,6 +314,10 @@ impl CommandContext {
         self.wallet.borrow().clone()
     }
 
+    pub fn take_wallet_value(&self) -> Option<Rc<Wallet>> {
+        self.wallet.take()
+    }
+
     pub fn set_pool_value(&self, value: Option<Pool>) {
         self.pool.replace(value.map(|value| Rc::new(value)));
     }
