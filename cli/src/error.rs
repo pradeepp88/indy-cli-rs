@@ -13,8 +13,6 @@ pub enum CliError {
     NotFound(String),
     #[error("`{0}`")]
     InvalidEntityState(String),
-    #[error("`{0}`")]
-    Unimplemented(String),
     #[error("Invalid input parameter provided `{0}`")]
     InvalidInput(String),
     #[error("Aries Askar error occurred `{0}`")]
@@ -69,8 +67,7 @@ impl CliError {
             CliError::InvalidInput(message)
             | CliError::InvalidEntityState(message)
             | CliError::NotFound(message)
-            | CliError::Duplicate(message)
-            | CliError::Unimplemented(message) => message.to_string(),
+            | CliError::Duplicate(message) => message.to_string(),
             CliError::VdrError(vdr_error) => match vdr_error.kind() {
                 VdrErrorKind::Config => "Pool configuration is invalid.".to_string(),
                 VdrErrorKind::Connection => format!(

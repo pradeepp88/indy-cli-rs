@@ -3,7 +3,5 @@
     https://www.dsr-corporation.com
     SPDX-License-Identifier: Apache-2.0
 */
-pub mod did;
-pub mod ledger;
-pub mod pool;
-pub mod wallet;
+pub const KEY_TYPE: &'static str = "ed25519";
+pub const CATEGORY_DID: &'static str = "did";

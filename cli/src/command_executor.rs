@@ -1,7 +1,5 @@
 use unescape::unescape;
 
-use aries_askar::any::AnyStore;
-use indy_vdr::pool::LocalPool;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -9,6 +7,7 @@ use std::{
     rc::Rc,
 };
 
+use crate::tools::{pool::Pool, wallet::Wallet};
 use linefeed::{ReadResult, Reader};
 
 #[derive(Debug)]
@@ -228,8 +227,8 @@ pub struct CommandContext {
     main_prompt: RefCell<String>,
     sub_prompts: RefCell<BTreeMap<usize, String>>,
     is_exit: RefCell<bool>,
-    pool: RefCell<Option<Rc<LocalPool>>>,
-    store: RefCell<Option<Rc<AnyStore>>>,
+    pool: RefCell<Option<Rc<Pool>>>,
+    wallet: RefCell<Option<Rc<Wallet>>>,
     int_values: RefCell<HashMap<&'static str, i32>>,
     uint_values: RefCell<HashMap<&'static str, u64>>,
     string_values: RefCell<HashMap<&'static str, String>>,
@@ -262,7 +261,7 @@ impl CommandContext {
             sub_prompts: RefCell::new(BTreeMap::new()),
             is_exit: RefCell::new(false),
             pool: RefCell::new(None),
-            store: RefCell::new(None),
+            wallet: RefCell::new(None),
             int_values: RefCell::new(HashMap::new()),
             uint_values: RefCell::new(HashMap::new()),
             string_values: RefCell::new(HashMap::new()),
@@ -304,19 +303,22 @@ impl CommandContext {
         *self.is_exit.borrow()
     }
 
-    pub fn set_store_value(&self, value: Option<AnyStore>) {
-        self.store.replace(value.map(|value| Rc::new(value)));
+    pub fn set_wallet_value(&self, value: Option<Wallet>) {
+        match value {
+            Some(value) => self.wallet.replace(Some(Rc::new(value))),
+            None => self.wallet.replace(None),
+        };
     }
 
-    pub fn get_store_value(&self) -> Option<Rc<AnyStore>> {
-        self.store.borrow().clone()
+    pub fn get_wallet_value(&self) -> Option<Rc<Wallet>> {
+        self.wallet.borrow().clone()
     }
 
-    pub fn set_pool_value(&self, value: Option<LocalPool>) {
+    pub fn set_pool_value(&self, value: Option<Pool>) {
         self.pool.replace(value.map(|value| Rc::new(value)));
     }
 
-    pub fn get_pool_value(&self) -> Option<Rc<LocalPool>> {
+    pub fn get_pool_value(&self) -> Option<Rc<Pool>> {
         self.pool.borrow().clone()
     }
 

@@ -6,11 +6,10 @@ pub mod term;
 pub mod file;
 pub mod futures;
 pub mod history;
-pub mod pool_config;
 pub mod table;
 #[cfg(test)]
 pub mod test;
-pub mod wallet_config;
+pub mod time;
 
 #[macro_export] //TODO move to more relevant place
 macro_rules! update_json_map_opt_key {

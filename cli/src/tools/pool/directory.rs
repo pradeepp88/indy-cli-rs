@@ -1,3 +1,8 @@
+/*
+    Copyright 2023 DSR Corporation, Denver, Colorado.
+    https://www.dsr-corporation.com
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::utils::environment::EnvironmentUtils;
 use std::{
     fs,
@@ -7,14 +12,14 @@ use std::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
+pub struct PoolConfig {
     pub genesis_txn: String,
 }
 
-pub struct PoolConfig {}
+pub struct PoolDirectory {}
 
-impl PoolConfig {
-    pub(crate) fn store(name: &str, config: &Config) -> Result<(), std::io::Error> {
+impl PoolDirectory {
+    pub(crate) fn store_pool_config(name: &str, config: &PoolConfig) -> Result<(), std::io::Error> {
         let mut path = EnvironmentUtils::pool_path(name);
 
         if path.as_path().exists() {
@@ -54,17 +59,7 @@ impl PoolConfig {
         Ok(())
     }
 
-    pub(crate) fn write_transactions(
-        name: &str,
-        transactions: &Vec<String>,
-    ) -> Result<(), std::io::Error> {
-        let path = EnvironmentUtils::pool_transactions_path(name);
-        let mut f = File::create(path.as_path())?;
-        f.write_all(transactions.join("\n").as_bytes())?;
-        Ok(())
-    }
-
-    pub(crate) fn read(id: &str) -> Result<Config, std::io::Error> {
+    pub(crate) fn read_pool_config(id: &str) -> Result<PoolConfig, std::io::Error> {
         let path = EnvironmentUtils::pool_config_path(id);
 
         let mut config_json = String::new();
@@ -76,7 +71,7 @@ impl PoolConfig {
         Ok(config)
     }
 
-    pub(crate) fn delete(name: &str) -> Result<(), std::io::Error> {
+    pub(crate) fn delete_pool_config(name: &str) -> Result<(), std::io::Error> {
         let path = EnvironmentUtils::pool_path(name);
         if !path.as_path().exists() {
             return Err(std::io::Error::new(
@@ -87,7 +82,7 @@ impl PoolConfig {
         fs::remove_dir_all(path)
     }
 
-    pub(crate) fn list() -> Result<String, std::io::Error> {
+    pub(crate) fn list_pools() -> Result<String, std::io::Error> {
         let mut pools = Vec::new();
         let pool_home_path = EnvironmentUtils::pool_home_path();
 
@@ -111,5 +106,15 @@ impl PoolConfig {
 
         let pools = json!(pools).to_string();
         Ok(pools)
+    }
+
+    pub(crate) fn store_pool_transactions(
+        name: &str,
+        transactions: &Vec<String>,
+    ) -> Result<(), std::io::Error> {
+        let path = EnvironmentUtils::pool_transactions_path(name);
+        let mut f = File::create(path.as_path())?;
+        f.write_all(transactions.join("\n").as_bytes())?;
+        Ok(())
     }
 }

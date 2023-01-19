@@ -1,30 +1,39 @@
+/*
+    Copyright 2023 DSR Corporation, Denver, Colorado.
+    https://www.dsr-corporation.com
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::{
     error::{CliError, CliResult},
-    utils::{
-        futures::block_on,
-        pool_config::{Config, PoolConfig},
-    },
+    utils::futures::block_on,
 };
 use std::collections::HashMap;
 
+use directory::{PoolConfig, PoolDirectory};
 use indy_vdr::{
     config::PoolConfig as OpenPoolConfig,
     pool::{helpers::perform_refresh, LocalPool, Pool as PoolImpl, PoolBuilder, PoolTransactions},
 };
 
-pub struct Pool {}
+pub mod directory;
+
+pub struct Pool(LocalPool);
 
 impl Pool {
-    pub fn create_config(name: &str, config: &Config) -> CliResult<()> {
-        PoolConfig::store(name, config).map_err(CliError::from)
+    pub fn value(&self) -> &LocalPool {
+        &self.0
+    }
+
+    pub fn create(name: &str, config: &PoolConfig) -> CliResult<()> {
+        PoolDirectory::store_pool_config(name, config).map_err(CliError::from)
     }
 
     pub fn open(
         name: &str,
         config: OpenPoolConfig,
         pre_ordered_nodes: Option<Vec<&str>>,
-    ) -> CliResult<LocalPool> {
-        let pool_transactions_file = PoolConfig::read(name)
+    ) -> CliResult<Pool> {
+        let pool_transactions_file = PoolDirectory::read_pool_config(name)
             .map_err(|_| CliError::NotFound(format!("Pool \"{}\" does not exist.", name)))?
             .genesis_txn;
 
@@ -37,14 +46,16 @@ impl Pool {
 
         let pool_transactions = PoolTransactions::from_json_file(&pool_transactions_file)?;
 
-        PoolBuilder::from(config)
+        let pool = PoolBuilder::from(config)
             .transactions(pool_transactions)?
             .node_weights(weight_nodes)
-            .into_local()
-            .map_err(CliError::from)
+            .into_local()?;
+
+        Ok(Pool(pool))
     }
 
-    pub fn refresh(name: &str, pool: &LocalPool) -> CliResult<Option<LocalPool>> {
+    pub fn refresh(&self, name: &str) -> CliResult<Option<Pool>> {
+        let pool = self.value();
         let (transactions, _) = block_on(async move { perform_refresh(pool).await })?;
 
         match transactions {
@@ -56,23 +67,23 @@ impl Pool {
                     .transactions(transactions)?
                     .into_local()?;
 
-                PoolConfig::write_transactions(name, &pool.get_json_transactions()?)?;
+                PoolDirectory::store_pool_transactions(name, &pool.get_json_transactions()?)?;
 
-                Ok(Some(pool))
+                Ok(Some(Pool(pool)))
             }
             _ => Ok(None),
         }
     }
 
     pub fn list() -> CliResult<String> {
-        PoolConfig::list().map_err(CliError::from)
+        PoolDirectory::list_pools().map_err(CliError::from)
     }
 
-    pub fn close(_pool: &LocalPool) -> CliResult<()> {
+    pub fn close(&self) -> CliResult<()> {
         Ok(())
     }
 
     pub fn delete(name: &str) -> CliResult<()> {
-        PoolConfig::delete(name).map_err(CliError::from)
+        PoolDirectory::delete_pool_config(name).map_err(CliError::from)
     }
 }

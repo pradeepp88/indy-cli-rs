@@ -3,7 +3,5 @@
     https://www.dsr-corporation.com
     SPDX-License-Identifier: Apache-2.0
 */
-pub mod did;
-pub mod ledger;
-pub mod pool;
-pub mod wallet;
+pub const SIGN_REQUEST: bool = true;
+pub const SEND_REQUEST: bool = true;
