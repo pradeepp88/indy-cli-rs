@@ -21,21 +21,17 @@ by beginning the line with a `#`.
 
 ### Getting help
 The most simple way is just start cli by `indy-cli-rs` command and put `help` command. Also, you can look to
-[CLI design](./docs) doc that contains the list of commands and architecture overview.
+[CLI design document](docs/README.md) containing the list of commands and architecture overview.
 
 ### Options
 * -h and --help - Print usage.
 * --logger-config - Init logger according to a config file (default no logger initialized).
-* --plugins - Load plugins in Libindy (usage: <lib-1-name>:<init-func-1-name>,...,<lib-n-name>:<init-func-n-name>).
+* --plugins - **DEPRECATED** Load plugins in Libindy (usage: <lib-1-name>:<init-func-1-name>,...,<lib-n-name>:<init-func-n-name>).
 * --config - Define config file for CLI initialization. A config file can contain the following fields:
     * loggerConfig - path to a logger config file (is equal to usage of "--logger-config" option).
     * taaAcceptanceMechanism - transaction author agreement acceptance mechanism to be used when sending write transactions to the Ledger.
 
-
-### Notes
-Indy-CLI-rs depends on `term` rust library that has a system dependency on terminfo database. 
+### Troubleshooting
+CLI depends on `term` rust library that has a system dependency on terminfo database. 
 That is why CLI Debian package additionally installs `libncursesw5-dev` library.
 More about it read [here](https://crates.io/crates/term) at `Packaging and Distributing` section.
-
-
-

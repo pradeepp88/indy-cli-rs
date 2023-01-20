@@ -195,7 +195,7 @@ fn build_executor() -> CommandExecutor {
 }
 
 fn execute_stdin(command_executor: CommandExecutor) {
-    match Reader::new("indy-cli") {
+    match Reader::new("indy-cli-rs") {
         Ok(reader) => execute_interactive(command_executor, reader),
         Err(_) => execute_batch(&command_executor, None),
     }
@@ -261,21 +261,21 @@ fn _print_help() {
     println!();
     println_acc!("CLI supports 2 execution modes:");
     println_acc!(
-        "\tInteractive - reads commands from terminal. To start just run indy-cli without params."
+        "\tInteractive - reads commands from terminal. To start just run indy-cli-rs without params."
     );
-    println_acc!("\tUsage: indy-cli");
+    println_acc!("\tUsage: indy-cli-rs");
     println!();
     println_acc!(
         "\tBatch - all commands will be read from text file or pipe and executed in series."
     );
-    println_acc!("\tUsage: indy-cli <path-to-text-file>");
+    println_acc!("\tUsage: indy-cli-rs <path-to-text-file>");
     println!();
     println_acc!("Options:");
     println_acc!("\tLoad plugins in Libindy.");
-    println_acc!("\tUsage: indy-cli --plugins <lib-1-name>:<init-func-1-name>,...,<lib-n-name>:<init-func-n-name>");
+    println_acc!("\tUsage: indy-cli-rs --plugins <lib-1-name>:<init-func-1-name>,...,<lib-n-name>:<init-func-n-name>");
     println!();
     println_acc!("\tInit logger according to a config file. \n\tIndy Cli uses `log4rs` logging framework: https://crates.io/crates/log4rs");
-    println_acc!("\tUsage: indy-cli --logger-config <path-to-config-file>");
+    println_acc!("\tUsage: indy-cli-rs --logger-config <path-to-config-file>");
     println!();
     println_acc!(
         "\tUse config file for CLI initialization. A config file can contain the following fields:"
@@ -283,7 +283,7 @@ fn _print_help() {
     println_acc!("\t\tplugins - a list of plugins to load in Libindy (is equal to usage of \"--plugins\" option).");
     println_acc!("\t\tloggerConfig - path to a logger config file (is equal to usage of \"--logger-config\" option).");
     println_acc!("\t\ttaaAcceptanceMechanism - transaction author agreement acceptance mechanism to use for sending write transactions to the Ledger.");
-    println_acc!("\tUsage: indy-cli --config <path-to-config-json-file>");
+    println_acc!("\tUsage: indy-cli-rs --config <path-to-config-json-file>");
     println!();
 }
 

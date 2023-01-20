@@ -259,7 +259,7 @@ impl Debug for CommandContext {
 impl CommandContext {
     pub fn new() -> CommandContext {
         CommandContext {
-            main_prompt: RefCell::new("indy".to_owned()),
+            main_prompt: RefCell::new("indy-cli-rs".to_owned()),
             sub_prompts: RefCell::new(BTreeMap::new()),
             is_exit: RefCell::new(false),
             pool: RefCell::new(None),

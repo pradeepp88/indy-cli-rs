@@ -58,8 +58,11 @@ impl WalletUri {
         path.push(&config.id);
         path.set_extension("db");
 
-        let path = path.to_string_lossy().to_string();
-        let uri = format!("{}://{}", "sqlite", path);
+        let uri = format!(
+            "{}://{}",
+            StorageType::Sqlite.to_str(),
+            path.to_string_lossy()
+        );
         Ok(uri)
     }
 
@@ -116,8 +119,13 @@ impl WalletUri {
         let query_params = params.join("&").to_string();
 
         let uri = format!(
-            "{}:{}@{}/{}?{}",
-            account, password, config_url, &config.id, query_params
+            "{}://{}:{}@{}/{}?{}",
+            StorageType::Postgres.to_str(),
+            account,
+            password,
+            config_url,
+            &config.id,
+            query_params
         );
 
         Ok(uri)
@@ -125,8 +133,8 @@ impl WalletUri {
 
     fn map_storage_type(storage_type: &str) -> CliResult<StorageType> {
         match storage_type {
-            "default" | "sqlite" => Ok(StorageType::Sqlite),
-            "postgres" => Ok(StorageType::Postgres),
+            "default" | "sqlite" | "sqlite_storage" => Ok(StorageType::Sqlite),
+            "postgres" | "postgres_storage" => Ok(StorageType::Postgres),
             value => Err(CliError::InvalidInput(format!(
                 "Unsupported storage type provided: {}",
                 value
