@@ -274,7 +274,9 @@ impl Ledger {
         package: Option<&str>,
     ) -> CliResult<PreparedRequest> {
         let schedule: Option<Schedule> = match schedule {
-            Some(schedule) => Some(serde_json::from_str::<Schedule>(schedule)?),
+            Some(schedule) => Some(serde_json::from_str::<Schedule>(schedule).map_err(|_| {
+                CliError::InvalidInput(format!("Invalid value provided for `schedule` parameter"))
+            })?),
             None => None,
         };
 

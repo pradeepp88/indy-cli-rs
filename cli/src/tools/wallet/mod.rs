@@ -19,7 +19,6 @@ use self::{
     uri::{StorageType, WalletUri},
 };
 
-use crate::tools::did::key::Key;
 use aries_askar::{
     any::AnyStore, kms::LocalKey, Entry, EntryTag, Error as AskarError,
     ErrorKind as AskarErrorKind, ManageBackend,
@@ -354,11 +353,14 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn insert_key(&self, id: &str, key: &Key, metadata: Option<&str>) -> CliResult<()> {
+    pub async fn insert_key(
+        &self,
+        id: &str,
+        key: &LocalKey,
+        metadata: Option<&str>,
+    ) -> CliResult<()> {
         let mut session = self.store.session(None).await?;
-        session
-            .insert_key(id, key.value(), metadata, None, None)
-            .await?;
+        session.insert_key(id, key, metadata, None, None).await?;
         session.commit().await?;
         Ok(())
     }

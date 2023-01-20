@@ -9,7 +9,7 @@ use crate::{
 };
 
 use crate::tools::wallet::Wallet;
-use aries_askar::kms::{KeyAlg, LocalKey};
+use aries_askar::kms::{KeyAlg, LocalKey, SecretBytes};
 use indy_utils::base58;
 
 pub struct Key(LocalKey);
@@ -32,13 +32,17 @@ impl Key {
 
         let verkey = key.verkey()?;
 
-        store.insert_key(&verkey, &key, metadata).await?;
+        store.insert_key(&verkey, &key.value(), metadata).await?;
 
         Ok(key)
     }
 
-    pub fn value(&self) -> &LocalKey {
+    fn value(&self) -> &LocalKey {
         &self.0
+    }
+
+    pub fn verkey_bytes(&self) -> CliResult<SecretBytes> {
+        self.0.to_public_bytes().map_err(CliError::from)
     }
 
     pub fn verkey(&self) -> CliResult<String> {

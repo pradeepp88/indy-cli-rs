@@ -45,10 +45,10 @@ impl Did {
             let key = Key::create(store, seed, metadata).await?;
 
             let verkey = key.verkey()?;
-            let public_key = key.value().to_public_bytes()?;
+            let verkey_bytes = key.verkey_bytes()?;
             let mut did = match did {
                 Some(did) => did.to_string(),
-                None => base58::encode(&public_key[0..16]),
+                None => base58::encode(&verkey_bytes[0..16]),
             };
 
             let existing_did = Self::fetch_record(store, &did, false).await?;
@@ -59,7 +59,7 @@ impl Did {
             }
 
             let mut tags = vec![
-                EntryTag::Encrypted("verkey".to_string(), verkey.clone()),
+                EntryTag::Encrypted("verkey".to_string(), verkey.to_string()),
                 EntryTag::Encrypted("verkey_type".to_string(), KEY_TYPE.to_string()),
             ];
             if let Some(method) = method {
