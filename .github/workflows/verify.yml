@@ -1,4 +1,8 @@
-name: verify
+# Copyright 2023 DSR Corporation, Denver, Colorado.
+# https://www.dsr-corporation.com
+# SPDX-License-Identifier: Apache-2.0
+
+name: Verify
 
 on:
   pull_request:
@@ -9,7 +13,6 @@ jobs:
 
   release-ready:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     defaults:
       run:
         shell: bash
@@ -23,27 +26,13 @@ jobs:
         run: |
           version="$(cargo -q metadata --no-deps \
             | jq -r '.packages[] | select(.name == "indy-cli-rs") | .version')"
+          echo "current_version=$version" >> $GITHUB_OUTPUT
           echo "$version"
-          echo "::set-output name=current_version::$version"
 
       - name: Check version format
         run: |
           # verify the version has "MAJOR.MINOR.PATCH" parts only
           echo "${{ steps.current_version.outputs.current_version }}" | grep -e '^[0-9]\+\.[0-9]\+\.[0-9]\+$'
-
-      # TODO improve (DRY): copy-paste from release.yml
-      - name: Get release info
-        id: release_info
-        run: |
-          release_info="$(curl -s https://api.github.com/repos/${{ github.repository }}/releases \
-              | jq '.[] | select(.name == "v${{ steps.current_version.outputs.current_version }}")')"
-          echo "::set-output name=release_info::$release_info"
-          echo "$release_info"
-
-      - name: Check version bumped
-        # TODO check if greater than latest tag / release (?)
-        if: steps.release_info.outputs.release_info
-        run: exit 1
 
         # Uncomment when all dependencies are published
 #      - name: Check it can be packaged
@@ -61,8 +50,6 @@ jobs:
     defaults:
       run:
         working-directory: cli
-    env:
-      RUST_TEST_THREADS: 1
 
     steps:
       - name: Checkout
@@ -99,4 +86,6 @@ jobs:
 
       - name: Run tests
         if: matrix.os != 'windows-latest'
+        env:
+          RUST_TEST_THREADS: 1
         run: cargo test --verbose
