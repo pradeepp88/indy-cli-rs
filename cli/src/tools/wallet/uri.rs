@@ -11,6 +11,7 @@ use crate::{
 
 use crate::tools::wallet::directory::WalletConfig;
 use std::path::PathBuf;
+use urlencoding::encode;
 
 pub enum StorageType {
     Sqlite,
@@ -61,8 +62,9 @@ impl WalletUri {
         let uri = format!(
             "{}://{}",
             StorageType::Sqlite.to_str(),
-            path.to_string_lossy()
+            encode(&path.to_string_lossy())
         );
+
         Ok(uri)
     }
 
@@ -99,7 +101,6 @@ impl WalletUri {
                 "No 'password' provided for postgres store".to_string(),
             ))?;
 
-        // FIXME: Find proper way to build and encode URI
         let mut params: Vec<String> = Vec::new();
         if let Some(connection_timeout) = storage_config["connect_timeout"].as_u64() {
             params.push(format!("connect_timeout={}", connection_timeout))
@@ -111,21 +112,21 @@ impl WalletUri {
             params.push(format!("min_idle_count={}", min_idle_count))
         }
         if let Some(admin_account) = storage_credentials["admin_account"].as_str() {
-            params.push(format!("admin_account={}", admin_account))
+            params.push(format!("admin_account={}", encode(admin_account)))
         }
         if let Some(admin_password) = storage_credentials["admin_password"].as_str() {
-            params.push(format!("admin_password={}", admin_password))
+            params.push(format!("admin_password={}", encode(admin_password)))
         }
         let query_params = params.join("&").to_string();
 
         let uri = format!(
             "{}://{}:{}@{}/{}?{}",
             StorageType::Postgres.to_str(),
-            account,
-            password,
+            encode(account),
+            encode(password),
             config_url,
-            &config.id,
-            query_params
+            encode(&config.id),
+            &query_params
         );
 
         Ok(uri)
