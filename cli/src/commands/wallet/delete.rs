@@ -47,7 +47,7 @@ pub mod delete_command {
             ..Credentials::default()
         };
 
-        if let Some(wallet) = ctx.take_opened_wallet() {
+        if let Some(wallet) = ctx.take_opened_wallet()? {
             close_wallet(ctx, wallet)?;
         }
 

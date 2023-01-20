@@ -70,13 +70,14 @@ impl CommandContext {
         self.get_wallet()
     }
 
-    pub fn take_opened_wallet(&self) -> Option<Wallet> {
+    pub fn take_opened_wallet(&self) -> Result<Option<Wallet>, ()> {
         let wallet = self.take_wallet();
         if let Some(wallet) = wallet {
-            let wallet = Rc::try_unwrap(wallet).unwrap();
-            Some(wallet)
+            let wallet = Rc::try_unwrap(wallet)
+                .map_err(|_| println_err!("Unable to take the wallet ownership"))?;
+            Ok(Some(wallet))
         } else {
-            None
+            Ok(None)
         }
     }
 

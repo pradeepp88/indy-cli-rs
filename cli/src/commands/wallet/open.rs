@@ -58,11 +58,13 @@ pub mod open_command {
 
         ctx.reset_active_did();
 
-        if let Some(wallet) = ctx.take_opened_wallet() {
+        if let Some(wallet) = ctx.get_opened_wallet() {
             if wallet.name == config.id {
                 println_err!("Wallet \"{}\" already opened.", wallet.name);
                 return Err(());
             }
+        }
+        if let Some(wallet) = ctx.take_opened_wallet()? {
             close_wallet(ctx, wallet)?;
         }
 
@@ -79,7 +81,7 @@ pub mod open_command {
     pub fn cleanup(ctx: &CommandContext) {
         trace!("cleanup >> ctx {:?}", ctx);
 
-        if let Some(wallet) = ctx.take_opened_wallet() {
+        if let Ok(Some(wallet)) = ctx.take_opened_wallet() {
             close_wallet(ctx, wallet).ok();
         }
 

@@ -138,19 +138,15 @@ pub mod rotate_key_command {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{commands::ledger::tests::send_nym, tools::did::Did};
+    use crate::tools::did::Did;
 
     mod did_rotate_key {
         use super::*;
         use crate::{
-            commands::{
-                setup, setup_with_wallet_and_pool, submit_retry, tear_down,
-                tear_down_with_wallet_and_pool,
-            },
-            did::tests::{get_did_info, new_did, use_did, DID_TRUSTEE, SEED_TRUSTEE},
-            pool::tests::{create_and_connect_pool, disconnect_and_delete_pool},
+            commands::{setup_with_wallet_and_pool, submit_retry, tear_down_with_wallet_and_pool},
+            did::tests::get_did_info,
+            ledger::tests::use_new_identity,
             tools::ledger::Ledger,
-            wallet::tests::{close_and_delete_wallet, create_and_open_wallet},
         };
         use indy_utils::did::DidValue;
 
@@ -182,22 +178,18 @@ pub mod tests {
         pub fn rotate_works() {
             let ctx = setup_with_wallet_and_pool();
 
-            new_did(&ctx, SEED_TRUSTEE);
-
-            let wallet = ctx.ensure_opened_wallet().unwrap();
-            let (did, verkey) = Did::create(&wallet, None, None, None, None).unwrap();
-            use_did(&ctx, DID_TRUSTEE);
-            send_nym(&ctx, &did, &verkey, None);
+            let (did, verkey) = use_new_identity(&ctx);
             ensure_nym_written(&ctx, &did, &verkey);
-            use_did(&ctx, &did);
 
             let did_info = get_did_info(&ctx, &did);
             assert_eq!(did_info.verkey, verkey);
+
             {
                 let cmd = rotate_key_command::new();
                 let params = CommandParams::new();
                 cmd.execute(&ctx, &params).unwrap();
             }
+
             let did_info = get_did_info(&ctx, &did);
             assert_ne!(did_info.verkey, verkey);
 
@@ -206,26 +198,29 @@ pub mod tests {
 
         #[test]
         pub fn rotate_resume_works_when_ledger_updated() {
-            let ctx = setup();
+            let ctx = setup_with_wallet_and_pool();
 
-            let wallet = create_and_open_wallet(&ctx);
-            create_and_connect_pool(&ctx);
-            let pool = ctx.ensure_connected_pool().unwrap();
+            let (did, verkey) = use_new_identity(&ctx);
 
-            new_did(&ctx, SEED_TRUSTEE);
-
-            let (did, verkey) = Did::create(&wallet, None, None, None, None).unwrap();
-            use_did(&ctx, DID_TRUSTEE);
-            send_nym(&ctx, &did, &verkey, None);
-            use_did(&ctx, &did);
-
-            let new_verkey = Did::replace_keys_start(&wallet, &did, None).unwrap();
-            let did = DidValue(did.to_string());
-            let mut request =
-                Ledger::build_nym_request(Some(&pool), &did, &did, Some(&new_verkey), None, None)
-                    .unwrap();
-            Ledger::sign_and_submit_request(&pool, &wallet, &did, &mut request).unwrap();
-            ensure_nym_written(&ctx, &did, &new_verkey);
+            // start key rotation and update ledger
+            let new_verkey = {
+                let pool = ctx.ensure_connected_pool().unwrap();
+                let wallet = ctx.ensure_opened_wallet().unwrap();
+                let new_verkey = Did::replace_keys_start(&wallet, &did, None).unwrap();
+                let did = DidValue(did.to_string());
+                let mut request = Ledger::build_nym_request(
+                    Some(&pool),
+                    &did,
+                    &did,
+                    Some(&new_verkey),
+                    None,
+                    None,
+                )
+                .unwrap();
+                Ledger::sign_and_submit_request(&pool, &wallet, &did, &mut request).unwrap();
+                ensure_nym_written(&ctx, &did, &new_verkey);
+                new_verkey
+            };
 
             let did_info = get_did_info(&ctx, &did);
             assert_eq!(did_info.verkey, verkey);
@@ -240,76 +235,62 @@ pub mod tests {
             assert_eq!(did_info.verkey, new_verkey);
             assert_eq!(did_info.next_verkey, None);
 
-            close_and_delete_wallet(&ctx);
-            disconnect_and_delete_pool(&ctx);
-            tear_down();
+            tear_down_with_wallet_and_pool(&ctx);
         }
 
         #[test]
         pub fn rotate_resume_works_when_ledger_not_updated() {
-            let ctx = setup();
+            let ctx = setup_with_wallet_and_pool();
 
-            let wallet = create_and_open_wallet(&ctx);
-            create_and_connect_pool(&ctx);
+            let (did, verkey) = use_new_identity(&ctx);
 
-            new_did(&ctx, SEED_TRUSTEE);
-
-            let (did, verkey) = Did::create(&wallet, None, None, None, None).unwrap();
-            use_did(&ctx, DID_TRUSTEE);
-            send_nym(&ctx, &did, &verkey, None);
-            use_did(&ctx, &did);
-            ensure_nym_written(&ctx, &did, &verkey);
-
-            let new_verkey = Did::replace_keys_start(&wallet, &did, None).unwrap();
+            let new_verkey = {
+                let wallet = ctx.ensure_opened_wallet().unwrap();
+                Did::replace_keys_start(&wallet, &did, None).unwrap()
+            };
 
             let did_info = get_did_info(&ctx, &did);
             assert_eq!(did_info.verkey, verkey);
             assert_eq!(did_info.next_verkey.unwrap(), new_verkey);
+
             {
                 let cmd = rotate_key_command::new();
                 let mut params = CommandParams::new();
                 params.insert("resume", "true".to_string());
                 cmd.execute(&ctx, &params).unwrap();
             }
+
             let did_info = get_did_info(&ctx, &did);
             assert_eq!(did_info.verkey, new_verkey);
             assert_eq!(did_info.next_verkey, None);
 
-            close_and_delete_wallet(&ctx);
-            disconnect_and_delete_pool(&ctx);
-            tear_down();
+            tear_down_with_wallet_and_pool(&ctx);
         }
 
         #[test]
         pub fn rotate_resume_without_started_rotation_rejected() {
-            let ctx = setup();
+            let ctx = setup_with_wallet_and_pool();
 
-            let wallet = create_and_open_wallet(&ctx);
-            create_and_connect_pool(&ctx);
-
-            new_did(&ctx, SEED_TRUSTEE);
-
-            let (did, verkey) = Did::create(&wallet, None, None, None, None).unwrap();
-            use_did(&ctx, DID_TRUSTEE);
-            send_nym(&ctx, &did, &verkey, None);
-            use_did(&ctx, &did);
+            let (did, verkey) = use_new_identity(&ctx);
 
             let did_info = get_did_info(&ctx, &did);
             assert_eq!(did_info.verkey, verkey);
             assert_eq!(did_info.next_verkey, None);
+
             {
                 let cmd = rotate_key_command::new();
                 let mut params = CommandParams::new();
                 params.insert("resume", "true".to_string());
                 cmd.execute(&ctx, &params).unwrap_err();
             }
-            let did_info = get_did_info(&ctx, &did);
-            assert_eq!(did_info.verkey, verkey); // it is not changed.
-            assert_eq!(did_info.next_verkey, None);
 
-            close_and_delete_wallet(&ctx);
-            disconnect_and_delete_pool(&ctx);
-            tear_down();
+            {
+                let did_info = get_did_info(&ctx, &did);
+                assert_eq!(did_info.verkey, verkey); // it is not changed.
+                assert_eq!(did_info.next_verkey, None);
+            }
+
+            tear_down_with_wallet_and_pool(&ctx);
         }
 
         #[test]

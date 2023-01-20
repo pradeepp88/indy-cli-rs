@@ -105,6 +105,7 @@ pub mod tests {
     mod import {
         use super::*;
         use crate::{
+            commands::setup_with_wallet,
             did::tests::{new_did, use_did, DID_MY1, SEED_MY1},
             wallet::{
                 close_command, create_command, delete_command, export_command, open_command,
@@ -118,9 +119,8 @@ pub mod tests {
 
         #[test]
         pub fn import_works() {
-            let ctx = setup();
+            let ctx = setup_with_wallet();
 
-            create_and_open_wallet(&ctx);
             new_did(&ctx, SEED_MY1);
             use_did(&ctx, DID_MY1);
 

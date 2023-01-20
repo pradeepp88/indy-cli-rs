@@ -150,7 +150,7 @@ pub mod tests {
         },
         ledger::{
             endorse_transaction_command,
-            tests::{create_new_did, send_nym, use_new_identity, use_trustee},
+            tests::{create_new_did, send_nym, use_new_endorser, use_trustee},
         },
     };
     use indy_utils::did::DidValue;
@@ -161,7 +161,7 @@ pub mod tests {
         #[test]
         pub fn schema_works() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             {
                 let cmd = schema_command::new();
                 let mut params = CommandParams::new();
@@ -220,7 +220,7 @@ pub mod tests {
         #[test]
         pub fn schema_works_without_sending() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             {
                 let cmd = schema_command::new();
                 let mut params = CommandParams::new();
@@ -238,7 +238,7 @@ pub mod tests {
         #[test]
         pub fn schema_works_without_signing() {
             let ctx = setup_with_wallet_and_pool();
-            use_new_identity(&ctx);
+            use_new_endorser(&ctx);
             {
                 let cmd = schema_command::new();
                 let mut params = CommandParams::new();
@@ -258,7 +258,7 @@ pub mod tests {
         #[test]
         pub fn schema_works_for_endorser() {
             let ctx = setup_with_wallet_and_pool();
-            let (endorser_did, _) = use_new_identity(&ctx);
+            let (endorser_did, _) = use_new_endorser(&ctx);
 
             // Publish new NYM without any role
             let (did, verkey) = create_new_did(&ctx);
@@ -291,7 +291,7 @@ pub mod tests {
         #[test]
         pub fn get_schema_works() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             {
                 let cmd = schema_command::new();
                 let mut params = CommandParams::new();
@@ -346,7 +346,7 @@ pub mod tests {
         #[test]
         pub fn schema_works_for_no_active_did() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             {
                 let cmd = schema_command::new();
                 let mut params = CommandParams::new();

@@ -16,7 +16,7 @@ pub mod close_command {
     fn execute(ctx: &CommandContext, params: &CommandParams) -> Result<(), ()> {
         trace!("execute >> ctx {:?} params {:?}", ctx, params);
 
-        if let Some(wallet) = ctx.take_opened_wallet() {
+        if let Some(wallet) = ctx.take_opened_wallet()? {
             close_wallet(ctx, wallet)?;
         } else {
             println_err!("There is no opened wallet now");

@@ -69,6 +69,14 @@ pub mod tests {
     pub fn use_new_identity(ctx: &CommandContext) -> (String, String) {
         use_trustee(ctx);
         let (did, verkey) = create_new_did(ctx);
+        send_nym(ctx, &did, &verkey, None);
+        use_did(&ctx, &did);
+        (did, verkey)
+    }
+
+    pub fn use_new_endorser(ctx: &CommandContext) -> (String, String) {
+        use_trustee(ctx);
+        let (did, verkey) = create_new_did(ctx);
         send_nym(ctx, &did, &verkey, Some("ENDORSER"));
         use_did(&ctx, &did);
         (did, verkey)

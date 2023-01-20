@@ -157,7 +157,7 @@ pub mod tests {
             setup_with_wallet_and_pool, submit_retry, tear_down_with_wallet_and_pool,
             wallet::tests::{close_wallet, open_wallet},
         },
-        ledger::tests::{use_new_identity, use_trustee},
+        ledger::tests::{use_new_endorser, use_trustee},
     };
     use indy_utils::{did::DidValue, Qualifiable};
     use indy_vdr::ledger::requests::schema::{AttributeNames, Schema, SchemaV1};
@@ -172,7 +172,7 @@ pub mod tests {
         #[test]
         pub fn cred_def_works() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             let schema_id = send_schema(&ctx, &did);
             {
                 let cmd = cred_def_command::new();
@@ -235,7 +235,7 @@ pub mod tests {
         #[test]
         pub fn cred_def_works_without_sending() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             let schema_id = send_schema(&ctx, &did);
             {
                 let cmd = cred_def_command::new();
@@ -259,7 +259,7 @@ pub mod tests {
         #[test]
         pub fn get_cred_def_works() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             let schema_id = send_schema(&ctx, &did);
             {
                 let cmd = cred_def_command::new();
@@ -302,7 +302,7 @@ pub mod tests {
         #[test]
         pub fn get_cred_def_works_for_no_active_did() {
             let ctx = setup_with_wallet_and_pool();
-            let (did, _) = use_new_identity(&ctx);
+            let (did, _) = use_new_endorser(&ctx);
             let schema_id = send_schema(&ctx, &did);
             {
                 let cmd = cred_def_command::new();
