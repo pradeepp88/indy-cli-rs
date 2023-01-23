@@ -1,9 +1,18 @@
 # CLI Design
 
 ## Execution modes
-CLI will support 2 execution modes:
-* Interactive. In this mode CLI will read commands from terminal interactively.
-* Batch. In this code all commands will be read from file or pipe and executed in series.
+CLI supports 2 execution modes:
+* Interactive:
+    * In this mode CLI reads commands from terminal interactively.
+    * To start this mode just run `indy-cli-rs` without params.
+* Batch:
+    * In this mode all commands will be read from a text file or pipe and executed in series.
+    * To start this mode run `indy-cli-rs <path-to-text-file>`.
+    * Batch mode supports the same commands as interactive mode.
+    * Note that by default if some command finishes with an error batch execution will be interrupted.
+        * To prevent this start command with `-`.
+        * For example, `-wallet create test`. In this case the result of this command will be ignored.
+    * To make a comment in the batch script start the line with the `#` symbol.
 
 ## Commands
 Command format
@@ -20,11 +29,17 @@ indy-cli-rs> help
 Print list of group commands with command help:
 ```
 indy-cli-rs> <group> help
+
+Example: 
+indy-cli-rs> wallet help
 ```
 
 Print command help, list of command param and help for each param:
 ```
 indy-cli-rs> <group> <command> help
+
+Example: 
+indy-cli-rs> wallet create help
 ```
 
 #### About
@@ -43,12 +58,18 @@ indy-cli-rs> exit
 Change command prompt:
 ```
 indy-cli-rs> prompt <new_prompt>
+
+Example: 
+indy-cli-rs> prompt my
 ```
 
 #### Show
 Print content of file:
 ```
 indy-cli-rs> show [<file_path>]
+
+Example: 
+indy-cli-rs> show /path/to/file.txt
 ```
 
 ### Wallets management commands (wallet group)
@@ -56,22 +77,36 @@ indy-cli-rs> show [<file_path>]
 indy-cli-rs> wallet <command>
 ```
 
-#### Wallet create
 Create new wallet and attach to CLI:
 ```
 indy-cli-rs> wallet create <wallet name> key [key_derivation_method=<key_derivation_method>] [storage_type=<storage_type>] [storage_config={config json}]
+
+// Example - Create Sqlite wallet with `wallet1` name, `key1` storage key, default key derivation methon (argon2m), and empty config/credentials
+indy-cli-rs> wallet create wallet1 key=key1
+
+// Example - Create Postgres wallet with `wallet_pstg` name, `key1` storage key, default key derivation methon (argon2m), and provided postgres config/credentials
+indy-cli-rs> wallet create wallet_pstg key=key1 storage_type=postgres_storage storage_config={"url":"localhost:5432"} storage_credentials={"account":"postgres","password":"mysecretpassword","admin_account":"postgres","admin_password":"mysecretpassword"}
 ```
 
 #### Wallet attach
 Attach existing wallet to Indy CLI:
 ```
 indy-cli-rs> wallet attach <wallet name> [storage_type=<storage_type>] [storage_config={config json}]
+
+// Example - Attach `wallet1` wallet to CLI
+indy-cli-rs> wallet attach wallet1
 ```
 
 #### Wallet open
 Open the wallet with specified name and make it available for commands that require wallet. If there was opened wallet it will be closed:
 ```
 indy-cli-rs> wallet open <wallet name> key [key_derivation_method=<key_derivation_method>] [rekey] [rekey_derivation_method=<rekey_derivation_method>]
+
+// Example - Open Sqlite wallet with `wallet1` name, `key1` key, default key derivation methon (argon2m), and empty config/credentials
+indy-cli-rs> wallet open wallet1 key=key1
+
+// Example - Open Postgres wallet with `wallet_pstg` name, `key1` key, default key derivation methon (argon2m), and provided postgres config/credentials
+indy-cli-rs> wallet open wallet_pstg key=key1 storage_credentials={"account":"postgres","password":"mysecretpassword","admin_account":"postgres","admin_password":"mysecretpassword"}
 ```
 
 #### Wallet close
@@ -84,12 +119,18 @@ indy-cli-rs> wallet close
 Delete the wallet
 ```
 indy-cli-rs> wallet delete <wallet name> key [key_derivation_method=<key_derivation_method>]
+
+// Example - Delete `wallet1` wallet
+indy-cli-rs> wallet delete wallet1 key=key1
 ```
 
 #### Wallet detach
 Detach wallet from Indy CLI
 ```
 indy-cli-rs> wallet detach <wallet name>
+
+// Example - Detach `wallet1` wallet from CLI
+indy-cli-rs> wallet detach wallet1
 ```
 
 #### Wallet list
@@ -103,6 +144,9 @@ Exports opened wallet to the specified file.
 
 ```indy-cli
 indy-cli-rs> wallet export export_path=<path-to-file> export_key=[<export key>] [export_key_derivation_method=<export_key_derivation_method>]
+
+Example: Export opened wallet into `/Users/indy-cli-rs/backup` file
+indy-cli-rs> wallet export export_path=/Users/indy-cli-rs/backup export_key=key
 ```
 
 ### Import wallet
@@ -110,6 +154,9 @@ Create new wallet and then import content from the specified file.
 
 ```indy-cli
 indy-cli-rs> wallet import <wallet name> key=<key> [key_derivation_method=<key_derivation_method>] export_path=<path-to-file> export_key=<key used for export>  [storage_type=<storage_type>] [storage_config={config json}]
+
+Example: Import wallet from `/Users/indy-cli-rs/backup` file
+indy-cli-rs> wallet import wallet_imported export_path=/Users/indy-cli-rs/backup export_key=key
 ```
 
 ### Pool management commands
@@ -121,12 +168,18 @@ indy-cli-rs> pool <subcommand>
 Create name pool (network) configuration
 ```
 indy-cli-rs> pool create [name=]<pool name> gen_txn_file=<gen txn file path> 
+
+Example: Create `pool1` pool with genesist transactions from `/home/gen_txns` file
+indy-cli-rs> pool create pool1 gen_txn_file=/home/gen_txns
 ```
 
 #### Connect
 Connect to Indy nodes pool and make it available for operation that require pool access. If there was pool connection it will be disconnected.
 ```
 indy-cli-rs> pool connect [name=]<pool name> [protocol-version=<version>] [timeout=<timeout>] [extended-timeout=<timeout>] [pre-ordered-nodes=<node names>]
+
+Example: Connect to `pool1` pool
+indy-cli-rs> pool connect pool1
 ```
 
 #### Refresh
@@ -139,6 +192,9 @@ indy-cli-rs> pool refresh
 Set protocol version that will be used for ledger requests. One of: 1, 2. Unless command is called the default protocol version 2 is used.
 ```
 indy-cli-rs> pool set-protocol-version [protocol-version=]<version>
+
+Example: Set `2` protocol version 
+indy-cli-rs> pool set-protocol-version 2
 ```
 
 #### Disconnect
@@ -162,6 +218,12 @@ indy-cli-rs> did <subcommand>
 Create and store my DID in the opened wallet. Requires opened wallet.
 ```
 indy-cli-rs> did new [did=<did>] [seed=<UTF-8, base64 or hex string>] [metadata=<metadata string>] [<method>=<did method name>]
+
+Example: Create a new random DID
+indy-cli-rs> did new
+
+Example: Create a new deterministic DID from the provided Seed value
+indy-cli-rs> did new seed=
 ```
 
 #### List
@@ -174,24 +236,39 @@ indy-cli-rs> did list
 Use the DID as identity owner for commands that require identity owner:
 ```
 indy-cli-rs> did use [did=]<did>
+
+Example: Use `MYDID000000000000000000001` DID as the active
+indy-cli-rs> did use MYDID000000000000000000001
 ```
 
 #### Rotate key
 Rotate keys for used DID. Sends NYM to the ledger with updated keys. Requires opened wallet and connection to pool:
 ```
-indy-cli-rs> did rotate-key [seed=<UTF-8, base64 or hex string>]
+indy-cli-rs> did rotate-key [seed=<UTF-8, base64 or hex string>] [resume=<bool>]
+
+Example: Rotate key to a random one
+indy-cli-rs> did rotate-key
+
+Example: Rotate key to a new deterministic one from the provided Seed value
+indy-cli-rs> did rotate-key seed=00000000000000000000000000000My2
 ```
 
 #### Qualify DID
 Update DID stored in the wallet to make fully qualified, or to do other DID maintenance:
 ```
 indy-cli-rs> did qualify did=<did> method=<method>
+
+Example: Qualify the did to be `indy` prefixed
+indy-cli-rs> did qualify did=VsKV7grR1BUE29mG2Fm2kX method=indy
 ```
 
 #### Set DID Metadata
 Update metadata for DID stored in the wallet:
 ```
 indy-cli-rs> did set-metadata did=<did> metadata=<metadata>
+
+Example: Qualify the did to be `indy` prefixed
+indy-cli-rs> did qualify did=VsKV7grR1BUE29mG2Fm2kX metadata="Test DID"
 ```
 
 ### Ledger transactions/messages

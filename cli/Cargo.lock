@@ -1398,7 +1398,7 @@ dependencies = [
 [[package]]
 name = "indy-vdr"
 version = "0.4.0-dev.1"
-source = "git+https://github.com/Artemkaaas/indy-vdr.git#bc778c370735a7b4879e9a782be9b6d31f4baea3"
+source = "git+https://github.com/Artemkaaas/indy-vdr.git#1f0c66221c7c5b8a7704b640ca1c25cb8debf172"
 dependencies = [
  "env_logger 0.10.0",
  "etcommon-rlp",
