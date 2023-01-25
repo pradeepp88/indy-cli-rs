@@ -8,10 +8,7 @@ use crate::{
         Command, CommandContext, CommandMetadata, CommandParams, DynamicCompletionType,
     },
     params_parser::ParamParser,
-    tools::wallet::{
-        directory::{WalletConfig, WalletDirectory},
-        Credentials, Wallet,
-    },
+    tools::wallet::{wallet_config::WalletConfig, Credentials, Wallet},
 };
 
 pub mod import_command {
@@ -73,7 +70,7 @@ pub mod import_command {
             storage_credentials,
         };
 
-        if WalletDirectory::is_wallet_config_exist(id) {
+        if config.exists() {
             println_err!("Wallet \"{}\" is already attached to CLI", id);
             return Err(());
         }
@@ -87,7 +84,8 @@ pub mod import_command {
         Wallet::import(&config, &credentials, &import_config)
             .map_err(|err| println_err!("{}", err.message(Some(id))))?;
 
-        WalletDirectory::store_wallet_config(id, &config)
+        config
+            .store()
             .map_err(|err| println_err!("Cannot store \"{}\" config file: {:?}", id, err))?;
 
         println_succ!("Wallet \"{}\" has been created", id);

@@ -5,8 +5,9 @@
 */
 pub mod backup;
 mod credentials;
-pub mod directory;
+pub mod libindy_backup_reader;
 mod uri;
+pub mod wallet_config;
 
 use crate::{
     error::{CliError, CliResult},
@@ -19,13 +20,24 @@ use self::{
     uri::{StorageType, WalletUri},
 };
 
-use aries_askar::{
-    any::AnyStore, kms::LocalKey, Entry, EntryTag, Error as AskarError,
-    ErrorKind as AskarErrorKind, ManageBackend,
+use crate::tools::{
+    did::{constants::KEY_TYPE, DidInfo},
+    wallet::{
+        backup::BackupKind,
+        libindy_backup_reader::{
+            DidMetadataRecord, DidRecord, KeyRecord, LibindyBackupReader, TemporaryDidRecord,
+        },
+    },
 };
-use backup::WalletBackup;
-use directory::{WalletConfig, WalletDirectory};
+use aries_askar::{
+    any::AnyStore,
+    kms::{KeyAlg, LocalKey},
+    Entry, EntryTag, Error as AskarError, ErrorKind as AskarErrorKind, ManageBackend,
+};
+use backup::Backup;
+use indy_utils::base58;
 use serde_json::Value as JsonValue;
+use wallet_config::{WalletConfig, WalletDirectory};
 
 #[derive(Debug)]
 pub struct Wallet {
@@ -58,7 +70,7 @@ pub struct ImportConfig {
 
 impl Wallet {
     pub fn create(config: &WalletConfig, credentials: &Credentials) -> CliResult<()> {
-        if WalletDirectory::is_wallet_config_exist(&config.id) {
+        if config.exists() {
             return Err(CliError::Duplicate(format!(
                 "Wallet \"{}\" already exists",
                 config.id
@@ -68,7 +80,7 @@ impl Wallet {
         let wallet_uri = WalletUri::build(config, credentials, None)?;
         let credentials = WalletCredentials::build(credentials)?;
 
-        WalletDirectory::create(config)?;
+        config.init_dir()?;
 
         block_on(async move {
             let store = wallet_uri
@@ -79,8 +91,7 @@ impl Wallet {
                     None,
                     false,
                 )
-                .await
-                .map_err(CliError::from)?;
+                .await?;
 
             // Askar: If there is any opened store when delete the wallet, function returns ok and deletes wallet file successfully
             // But next if we create wallet with the same again it will contain old records
@@ -128,18 +139,14 @@ impl Wallet {
         let wallet_uri = WalletUri::build(config, credentials, None)?;
 
         block_on(async move {
-            let removed = wallet_uri
-                .value()
-                .remove_backend()
-                .await
-                .map_err(CliError::from)?;
+            let removed = wallet_uri.value().remove_backend().await?;
             if !removed {
                 return Err(CliError::InvalidEntityState(format!(
                     "Unable to delete wallet {}",
                     config.id
                 )));
             }
-            WalletDirectory::delete(&config)?;
+            WalletDirectory::from_id(&config.id).delete()?;
             Ok(removed)
         })
     }
@@ -149,8 +156,10 @@ impl Wallet {
     }
 
     pub fn export(&self, export_config: &ExportConfig) -> CliResult<()> {
+        let backup = Backup::from_file(&export_config.path)?;
+
         let backup_config = WalletConfig {
-            id: WalletBackup::get_id(&export_config.path),
+            id: backup.id(),
             storage_type: StorageType::Sqlite.to_str().to_string(),
             ..WalletConfig::default()
         };
@@ -167,7 +176,7 @@ impl Wallet {
         )?;
         let backup_credentials = WalletCredentials::build(&backup_credentials)?;
 
-        WalletBackup::init_directory(&export_config.path)?;
+        backup.init_dir()?;
 
         block_on(async move {
             let backup_store = backup_uri
@@ -178,10 +187,9 @@ impl Wallet {
                     None,
                     false,
                 )
-                .await
-                .map_err(CliError::from)?;
+                .await?;
 
-            Self::copy_records(&self.store, &backup_store).await?;
+            Self::copy_records_from_askar_store(&self.store, &backup_store).await?;
 
             backup_store.close().await?;
 
@@ -194,22 +202,43 @@ impl Wallet {
         credentials: &Credentials,
         import_config: &ImportConfig,
     ) -> CliResult<()> {
-        if !WalletBackup::is_wallet_backup_exist(&import_config.path) {
+        let backup = Backup::from_file(&import_config.path)?;
+        if !backup.exists() {
             return Err(CliError::NotFound(format!(
-                "Wallet backup \"{}\" not found",
+                "Wallet backup \"{}\" does not exist",
                 import_config.path
             )));
         }
 
-        if WalletDirectory::is_wallet_config_exist(&config.id) {
+        if config.exists() {
             return Err(CliError::Duplicate(format!(
                 "Wallet \"{}\" already exists",
                 config.id
             )));
         }
 
+        block_on(async move {
+            match backup.kind()? {
+                BackupKind::Askar => {
+                    Self::import_askar_backup(&backup, &config, &credentials, &import_config).await
+                }
+                BackupKind::Libindy => {
+                    Self::import_libindy_backup(&backup, &config, &credentials, &import_config)
+                        .await
+                }
+            }
+        })
+    }
+
+    async fn import_askar_backup(
+        backup: &Backup,
+        config: &WalletConfig,
+        credentials: &Credentials,
+        import_config: &ImportConfig,
+    ) -> CliResult<()> {
+        // prepare config and credentials for backup and new wallet
         let backup_config = WalletConfig {
-            id: WalletBackup::get_id(&import_config.path),
+            id: backup.id(),
             storage_type: StorageType::Sqlite.to_str().to_string(),
             ..WalletConfig::default()
         };
@@ -219,6 +248,9 @@ impl Wallet {
             ..Credentials::default()
         };
 
+        let new_wallet_uri = WalletUri::build(&config, &credentials, None)?;
+        let new_wallet_credentials = WalletCredentials::build(&credentials)?;
+
         let backup_wallet_uri = WalletUri::build(
             &backup_config,
             &backup_credentials,
@@ -226,46 +258,79 @@ impl Wallet {
         )?;
         let backup_wallet_credentials = WalletCredentials::build(&backup_credentials)?;
 
+        // open backup storage
+        let backup_store: AnyStore = backup_wallet_uri
+            .value()
+            .open_backend(
+                Some(backup_wallet_credentials.key_method),
+                backup_wallet_credentials.key.as_ref(),
+                None,
+            )
+            .await
+            .map_err(|err: AskarError| match err.kind() {
+                AskarErrorKind::NotFound => CliError::NotFound(err.to_string()),
+                _ => CliError::from(err),
+            })?;
+
+        // create directory for new wallet and provision it
+        config.init_dir()?;
+
+        let new_store = new_wallet_uri
+            .value()
+            .provision_backend(
+                new_wallet_credentials.key_method,
+                new_wallet_credentials.key.as_ref(),
+                None,
+                false,
+            )
+            .await?;
+
+        // copy all records from the backup into the new wallet
+        Self::copy_records_from_askar_store(&backup_store, &new_store).await?;
+
+        // finish
+        backup_store.close().await?;
+        new_store.close().await?;
+
+        Ok(())
+    }
+
+    async fn import_libindy_backup(
+        _backup: &Backup,
+        config: &WalletConfig,
+        credentials: &Credentials,
+        import_config: &ImportConfig,
+    ) -> CliResult<()> {
+        // prepare config and credentials for new wallet
         let new_wallet_uri = WalletUri::build(&config, &credentials, None)?;
         let new_wallet_credentials = WalletCredentials::build(&credentials)?;
 
-        block_on(async move {
-            let backup_store: AnyStore = backup_wallet_uri
-                .value()
-                .open_backend(
-                    Some(backup_wallet_credentials.key_method),
-                    backup_wallet_credentials.key.as_ref(),
-                    None,
-                )
-                .await
-                .map_err(|err: AskarError| match err.kind() {
-                    AskarErrorKind::NotFound => CliError::NotFound(err.to_string()),
-                    _ => CliError::from(err),
-                })?;
+        // init libindy backup reader
+        let mut backup_reader = LibindyBackupReader::init(import_config)?;
 
-            WalletDirectory::create(config)?;
+        // create directory for new wallet and provision it
+        config.init_dir()?;
 
-            let new_store = new_wallet_uri
-                .value()
-                .provision_backend(
-                    new_wallet_credentials.key_method,
-                    new_wallet_credentials.key.as_ref(),
-                    None,
-                    false,
-                )
-                .await
-                .map_err(CliError::from)?;
+        let new_store = new_wallet_uri
+            .value()
+            .provision_backend(
+                new_wallet_credentials.key_method,
+                new_wallet_credentials.key.as_ref(),
+                None,
+                false,
+            )
+            .await?;
 
-            Self::copy_records(&backup_store, &new_store).await?;
+        // copy all records from the backup into the new wallet
+        Self::copy_records_from_libindy_backup(&mut backup_reader, &new_store).await?;
 
-            backup_store.close().await?;
-            new_store.close().await?;
+        // finish
+        new_store.close().await?;
 
-            Ok(())
-        })
+        Ok(())
     }
 
-    async fn copy_records(from: &AnyStore, to: &AnyStore) -> CliResult<()> {
+    async fn copy_records_from_askar_store(from: &AnyStore, to: &AnyStore) -> CliResult<()> {
         let mut from_session = from.session(None).await?;
         let mut to_session = to.session(None).await?;
 
@@ -309,6 +374,131 @@ impl Wallet {
         Ok(())
     }
 
+    async fn copy_records_from_libindy_backup(
+        backup_reader: &mut LibindyBackupReader,
+        to: &AnyStore,
+    ) -> CliResult<()> {
+        let mut to_session = to.session(None).await?;
+
+        while let Some(record) = backup_reader.read_record()? {
+            if record.type_ == "Indy::Key" {
+                let key: KeyRecord = serde_json::from_str(&record.value).map_err(|_| {
+                    CliError::InvalidInput(
+                        "Invalid backup content: Unable to parse key record".to_string(),
+                    )
+                })?;
+                let key_bytes = base58::decode(&key.signkey).map_err(|_| {
+                    CliError::InvalidInput(
+                        "Invalid backup content: Unable to decode key".to_string(),
+                    )
+                })?;
+                let key = LocalKey::from_seed(KeyAlg::Ed25519, &key_bytes, None)?;
+
+                to_session
+                    .insert_key(&record.id, &key, None, None, None)
+                    .await
+                    .ok();
+            } else if record.type_ == "Indy::Did" {
+                let key: DidRecord = serde_json::from_str(&record.value).map_err(|_| {
+                    CliError::InvalidInput(
+                        "Invalid backup content: Unable to parse key record".to_string(),
+                    )
+                })?;
+
+                let did_info = DidInfo {
+                    did: key.did,
+                    verkey: key.verkey,
+                    verkey_type: KEY_TYPE.to_string(),
+                    ..DidInfo::default()
+                };
+
+                let value = serde_json::to_vec(&did_info)?;
+
+                let tags = vec![
+                    EntryTag::Encrypted("verkey".to_string(), did_info.verkey.to_string()),
+                    EntryTag::Encrypted("verkey_type".to_string(), KEY_TYPE.to_string()),
+                ];
+
+                to_session
+                    .insert(CATEGORY_DID, &did_info.did, &value, Some(&tags), None)
+                    .await
+                    .ok();
+            } else if record.type_ == "Indy::TemporaryDid" {
+                let temporary_did: TemporaryDidRecord = serde_json::from_str(&record.value)
+                    .map_err(|_| {
+                        CliError::InvalidInput(
+                            "Invalid backup content: Unable to parse did record".to_string(),
+                        )
+                    })?;
+
+                let did_entry = to_session
+                    .fetch(CATEGORY_DID, &temporary_did.did, true)
+                    .await?
+                    .ok_or_else(|| {
+                        CliError::NotFound(format!(
+                            "DID {} does not exits in the wallet.",
+                            temporary_did.did
+                        ))
+                    })?;
+                let mut did_info: DidInfo = serde_json::from_slice(&did_entry.value)?;
+
+                did_info.next_verkey = Some(temporary_did.verkey.to_string());
+
+                let value = serde_json::to_vec(&did_info)?;
+                to_session
+                    .replace(
+                        CATEGORY_DID,
+                        &did_info.did,
+                        &value,
+                        Some(&did_entry.tags),
+                        None,
+                    )
+                    .await
+                    .ok();
+            } else if record.type_ == "Indy::DidMetadata" {
+                let metadata: DidMetadataRecord =
+                    serde_json::from_str(&record.value).map_err(|_| {
+                        CliError::InvalidInput(
+                            "Invalid backup content: Unable to parse did metadata record"
+                                .to_string(),
+                        )
+                    })?;
+
+                let did_entry = to_session
+                    .fetch(CATEGORY_DID, &record.id, true)
+                    .await?
+                    .ok_or_else(|| {
+                        CliError::NotFound(format!(
+                            "DID {} does not exits in the wallet.",
+                            record.id
+                        ))
+                    })?;
+                let mut did_info: DidInfo = serde_json::from_slice(&did_entry.value)?;
+
+                did_info.metadata = Some(metadata.value);
+
+                let value = serde_json::to_vec(&did_info)?;
+                to_session
+                    .replace(
+                        CATEGORY_DID,
+                        &did_info.did,
+                        &value,
+                        Some(&did_entry.tags),
+                        None,
+                    )
+                    .await
+                    .ok();
+            } else {
+                println_warn!("Unsupported record type {}", record.type_);
+                println_warn!("Record");
+                println_warn!("{:?}", record);
+            }
+        }
+
+        to_session.commit().await?;
+        Ok(())
+    }
+
     pub async fn store_record(
         &self,
         category: &str,
@@ -327,7 +517,7 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn fetch_all_record(&self, category: &str) -> CliResult<Vec<Entry>> {
+    pub async fn fetch_all_records(&self, category: &str) -> CliResult<Vec<Entry>> {
         let mut session = self.store.session(None).await?;
         let records = session.fetch_all(category, None, None, false).await?;
         session.commit().await?;

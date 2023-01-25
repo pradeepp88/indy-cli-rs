@@ -3,7 +3,10 @@
     https://www.dsr-corporation.com
     SPDX-License-Identifier: Apache-2.0
 */
-use crate::utils::environment::EnvironmentUtils;
+use crate::{
+    error::{CliError, CliResult},
+    utils::environment::EnvironmentUtils,
+};
 use std::{
     fs,
     fs::File,
@@ -19,14 +22,14 @@ pub struct PoolConfig {
 pub struct PoolDirectory {}
 
 impl PoolDirectory {
-    pub(crate) fn store_pool_config(name: &str, config: &PoolConfig) -> Result<(), std::io::Error> {
+    pub(crate) fn store_pool_config(name: &str, config: &PoolConfig) -> CliResult<()> {
         let mut path = EnvironmentUtils::pool_path(name);
 
         if path.as_path().exists() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                format!("Pool {} already exists!", name),
-            ));
+            return Err(CliError::Duplicate(format!(
+                "Pool {} already exists!",
+                name
+            )));
         }
 
         fs::create_dir_all(path.as_path())?;
@@ -59,7 +62,7 @@ impl PoolDirectory {
         Ok(())
     }
 
-    pub(crate) fn read_pool_config(id: &str) -> Result<PoolConfig, std::io::Error> {
+    pub(crate) fn read_pool_config(id: &str) -> CliResult<PoolConfig> {
         let path = EnvironmentUtils::pool_config_path(id);
 
         let mut config_json = String::new();
@@ -71,18 +74,18 @@ impl PoolDirectory {
         Ok(config)
     }
 
-    pub(crate) fn delete_pool_config(name: &str) -> Result<(), std::io::Error> {
+    pub(crate) fn delete_pool_config(name: &str) -> CliResult<()> {
         let path = EnvironmentUtils::pool_path(name);
         if !path.as_path().exists() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Pool \"{}\" does not exist.", name),
-            ));
+            return Err(CliError::NotFound(format!(
+                "Pool \"{}\" does not exist.",
+                name
+            )));
         }
-        fs::remove_dir_all(path)
+        fs::remove_dir_all(path).map_err(CliError::from)
     }
 
-    pub(crate) fn list_pools() -> Result<String, std::io::Error> {
+    pub(crate) fn list_pools() -> CliResult<String> {
         let mut pools = Vec::new();
         let pool_home_path = EnvironmentUtils::pool_home_path();
 
@@ -108,10 +111,7 @@ impl PoolDirectory {
         Ok(pools)
     }
 
-    pub(crate) fn store_pool_transactions(
-        name: &str,
-        transactions: &Vec<String>,
-    ) -> Result<(), std::io::Error> {
+    pub(crate) fn store_pool_transactions(name: &str, transactions: &Vec<String>) -> CliResult<()> {
         let path = EnvironmentUtils::pool_transactions_path(name);
         let mut f = File::create(path.as_path())?;
         f.write_all(transactions.join("\n").as_bytes())?;

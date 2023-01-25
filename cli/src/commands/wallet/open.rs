@@ -8,7 +8,7 @@ use crate::{
         Command, CommandContext, CommandMetadata, CommandParams, DynamicCompletionType,
     },
     params_parser::ParamParser,
-    tools::wallet::{directory::WalletDirectory, Credentials, Wallet},
+    tools::wallet::{Credentials, Wallet, wallet_config::WalletConfig},
     wallet::close_wallet,
 };
 
@@ -45,7 +45,7 @@ pub mod open_command {
             ParamParser::get_opt_str_param("rekey_derivation_method", params)?;
         let storage_credentials = ParamParser::get_opt_object_param("storage_credentials", params)?;
 
-        let config = WalletDirectory::read_wallet_config(id)
+        let config = WalletConfig::read(id)
             .map_err(|_| println_err!("Wallet \"{}\" isn't attached to CLI", id))?;
 
         let credentials = Credentials {

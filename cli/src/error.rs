@@ -10,6 +10,8 @@ pub enum CliError {
     #[error("`{0}`")]
     Duplicate(String),
     #[error("`{0}`")]
+    Unsupported(String),
+    #[error("`{0}`")]
     NotFound(String),
     #[error("`{0}`")]
     InvalidEntityState(String),
@@ -67,7 +69,8 @@ impl CliError {
             CliError::InvalidInput(message)
             | CliError::InvalidEntityState(message)
             | CliError::NotFound(message)
-            | CliError::Duplicate(message) => message.to_string(),
+            | CliError::Duplicate(message)
+            | CliError::Unsupported(message) => message.to_string(),
             CliError::VdrError(vdr_error) => match vdr_error.kind() {
                 VdrErrorKind::Config => "Pool configuration is invalid.".to_string(),
                 VdrErrorKind::Connection => format!(

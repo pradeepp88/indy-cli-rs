@@ -9,7 +9,7 @@ use crate::{
     utils::environment::EnvironmentUtils,
 };
 
-use crate::tools::wallet::directory::WalletConfig;
+use crate::tools::wallet::wallet_config::WalletConfig;
 use std::path::PathBuf;
 use urlencoding::encode;
 
@@ -52,12 +52,27 @@ impl WalletUri {
         _credentials: &Credentials,
         path: Option<&str>,
     ) -> CliResult<String> {
-        let mut path = match path {
-            Some(path) => PathBuf::from(path),
-            None => EnvironmentUtils::wallet_path(&config.id),
+        let path = match path {
+            Some(path) => {
+                let mut path = PathBuf::from(path);
+                let extension = path
+                    .extension()
+                    .map(|extension| extension.to_string_lossy().to_string());
+                if extension == Some("db".to_string()) {
+                    path
+                } else {
+                    path.push(&config.id);
+                    path.set_extension("db");
+                    path
+                }
+            }
+            None => {
+                let mut path = EnvironmentUtils::wallet_path(&config.id);
+                path.push(&config.id);
+                path.set_extension("db");
+                path
+            }
         };
-        path.push(&config.id);
-        path.set_extension("db");
 
         let uri = format!(
             "{}://{}",

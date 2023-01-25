@@ -18,7 +18,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
 dependencies = [
  "cfg-if 1.0.0",
- "cipher",
+ "cipher 0.3.0",
  "cpufeatures 0.2.5",
  "opaque-debug 0.3.0",
 ]
@@ -31,7 +31,7 @@ checksum = "df5f85a83a7d8b0442b6aa7b504b8212c1733da07b98aae43d4bc21b2cb3cdf6"
 dependencies = [
  "aead",
  "aes",
- "cipher",
+ "cipher 0.3.0",
  "ctr",
  "ghash",
  "subtle",
@@ -107,10 +107,9 @@ dependencies = [
 [[package]]
 name = "aries-askar"
 version = "0.2.7"
-source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
+source = "git+https://github.com/hyperledger/aries-askar.git#671b8ddaa36b5e6ec99b92d3591a6d2cdd45854d"
 dependencies = [
  "askar-crypto",
- "askar-wql",
  "async-lock",
  "async-stream",
  "bs58 0.4.0",
@@ -126,6 +125,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "percent-encoding",
+ "rand 0.8.5",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -141,7 +141,7 @@ dependencies = [
 [[package]]
 name = "askar-crypto"
 version = "0.2.5"
-source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
+source = "git+https://github.com/hyperledger/aries-askar.git#671b8ddaa36b5e6ec99b92d3591a6d2cdd45854d"
 dependencies = [
  "aead",
  "aes",
@@ -151,7 +151,7 @@ dependencies = [
  "blake2",
  "block-modes",
  "bls12_381",
- "chacha20",
+ "chacha20 0.7.1",
  "chacha20poly1305",
  "crypto_box",
  "curve25519-dalek",
@@ -170,15 +170,6 @@ dependencies = [
  "subtle",
  "x25519-dalek",
  "zeroize",
-]
-
-[[package]]
-name = "askar-wql"
-version = "0.1.0"
-source = "git+https://github.com/Artemkaaas/aries-askar.git#2f76b249e4bf46ef12324e1912e0042964e00cde"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -343,7 +334,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cb03d1bed155d89dce0f845b7899b18a9a163e148fd004e1c28421a783e2d8e"
 dependencies = [
  "block-padding 0.2.1",
- "cipher",
+ "cipher 0.3.0",
 ]
 
 [[package]]
@@ -447,9 +438,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fee7ad89dc1128635074c268ee661f90c3f7e83d9fd12910608c36b47d6c3412"
 dependencies = [
  "cfg-if 1.0.0",
- "cipher",
+ "cipher 0.3.0",
  "cpufeatures 0.1.5",
  "zeroize",
+]
+
+[[package]]
+name = "chacha20"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7fc89c7c5b9e7a02dfe45cd2367bae382f9ed31c61ca8debe5f827c420a2f08"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cipher 0.4.3",
+ "cpufeatures 0.2.5",
 ]
 
 [[package]]
@@ -459,8 +461,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1580317203210c517b6d44794abfbe600698276db18127e37ad3e69bf5e848e5"
 dependencies = [
  "aead",
- "chacha20",
- "cipher",
+ "chacha20 0.7.1",
+ "cipher 0.3.0",
  "poly1305",
  "zeroize",
 ]
@@ -487,6 +489,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
 dependencies = [
  "generic-array 0.14.6",
+]
+
+[[package]]
+name = "cipher"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1873270f8f7942c191139cb8a40fd228da6c3fd2fc376d7e92d47aa14aeb59e"
+dependencies = [
+ "crypto-common",
+ "inout",
+ "zeroize",
 ]
 
 [[package]]
@@ -595,10 +608,10 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1efe589deb705b2dcc2b6ad84162d355b819d1205b8d8498c0d149e36b329c30"
 dependencies = [
- "chacha20",
+ "chacha20 0.7.1",
  "chacha20poly1305",
  "rand_core 0.6.4",
- "salsa20",
+ "salsa20 0.8.0",
  "x25519-dalek",
  "xsalsa20poly1305",
  "zeroize",
@@ -632,7 +645,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "049bb91fb4aaf0e3c7efa6cd5ef877dbbbd15b39dad06d9948de4ec8a75761ea"
 dependencies = [
- "cipher",
+ "cipher 0.3.0",
 ]
 
 [[package]]
@@ -793,6 +806,26 @@ name = "dotenv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
+name = "dryoc"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f8ddb41c5ccec0f9de5e7d72d56112d6651963d2f596ea9a1e09844db58ec3f"
+dependencies = [
+ "bitflags 1.3.2",
+ "chacha20 0.9.0",
+ "curve25519-dalek",
+ "generic-array 0.14.6",
+ "lazy_static",
+ "libc",
+ "rand_core 0.6.4",
+ "salsa20 0.10.2",
+ "sha2 0.10.6",
+ "subtle",
+ "winapi 0.3.9",
+ "zeroize",
+]
 
 [[package]]
 name = "dtoa"
@@ -1337,8 +1370,10 @@ dependencies = [
  "ansi_term",
  "aries-askar",
  "atty",
+ "byteorder",
  "chrono",
  "dirs",
+ "dryoc",
  "failure_derive",
  "hex",
  "indy-utils",
@@ -1347,6 +1382,7 @@ dependencies = [
  "log",
  "log4rs",
  "prettytable-rs",
+ "rmp-serde 0.13.7",
  "rpassword",
  "serde",
  "serde_derive",
@@ -1415,7 +1451,7 @@ dependencies = [
  "pin-utils",
  "rand 0.8.5",
  "regex",
- "rmp-serde",
+ "rmp-serde 1.1.1",
  "serde",
  "serde_json",
  "sha3 0.10.6",
@@ -1432,6 +1468,15 @@ checksum = "f4aa37c6fbc387666de081f7e549e20aad2e165d545e7ba2cdb3c9a5a637c25a"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "inout"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0c10553d664a4d0bcff9f4215d0aac67a639cc68ef660840afe309b807bc9f5"
+dependencies = [
+ "generic-array 0.14.6",
 ]
 
 [[package]]
@@ -2128,6 +2173,17 @@ dependencies = [
 
 [[package]]
 name = "rmp-serde"
+version = "0.13.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "011e1d58446e9fa3af7cdc1fb91295b10621d3ac4cb3a85cc86385ee9ca50cd3"
+dependencies = [
+ "byteorder",
+ "rmp",
+ "serde",
+]
+
+[[package]]
+name = "rmp-serde"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c5b13be192e0220b8afb7222aa5813cb62cc269ebb5cac346ca6487681d2913e"
@@ -2218,8 +2274,17 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c7c5f10864beba947e1a1b43f3ef46c8cc58d1c2ae549fa471713e8ff60787a"
 dependencies = [
- "cipher",
+ "cipher 0.3.0",
  "zeroize",
+]
+
+[[package]]
+name = "salsa20"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97a22f5af31f73a954c10289c93e8a50cc23d971e80ee446f1f6f7137a088213"
+dependencies = [
+ "cipher 0.4.3",
 ]
 
 [[package]]
@@ -3138,7 +3203,7 @@ dependencies = [
  "aead",
  "poly1305",
  "rand_core 0.6.4",
- "salsa20",
+ "salsa20 0.8.0",
  "subtle",
  "zeroize",
 ]

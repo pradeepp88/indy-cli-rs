@@ -8,7 +8,7 @@ use crate::{
         Command, CommandContext, CommandMetadata, CommandParams, DynamicCompletionType,
     },
     params_parser::ParamParser,
-    tools::wallet::directory::{WalletConfig, WalletDirectory},
+    tools::wallet::wallet_config::WalletConfig,
 };
 
 pub mod attach_command {
@@ -32,18 +32,19 @@ pub mod attach_command {
             ParamParser::get_opt_str_param("storage_type", params)?.unwrap_or("default");
         let storage_config = ParamParser::get_opt_object_param("storage_config", params)?;
 
-        if WalletDirectory::is_wallet_config_exist(id) {
-            println_err!("Wallet \"{}\" is already attached to CLI", id);
-            return Err(());
-        }
-
         let config = WalletConfig {
             id: id.to_string(),
             storage_type: storage_type.to_string(),
             storage_config,
         };
 
-        WalletDirectory::store_wallet_config(id, &config)
+        if config.exists() {
+            println_err!("Wallet \"{}\" is already attached to CLI", id);
+            return Err(());
+        }
+
+        config
+            .store()
             .map_err(|err| println_err!("Cannot store wallet \"{}\" config file: {:?}", id, err))?;
 
         println_succ!("Wallet \"{}\" has been attached", id);

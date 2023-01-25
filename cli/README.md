@@ -40,7 +40,19 @@ CLI supports 2 execution modes:
 * Payment related commands and functionality are **not** included into **this** CLI.
 * Pool Ledger created by the **old** Indy-CLI **can** be also opened using **this** CLI.
 * Wallet created by the **old** Indy-CLI **cannot** be opened using **this** CLI due to different storage format.
-* Wallet backup created by the **old** Indy-CLI **cannot** be imported using **this** CLI due to different backup format.
+* Wallet backup created by the **old** Indy-CLI **can** be imported using **this** CLI due to different backup format.
+
+### Migration of wallet created by old [Indy-CLI](https://github.com/hyperledger/indy-sdk/tree/main/cli)
+1. Run old CLI and create wallet backup
+```
+indy-cli> wallet open wallet_to_export key
+indy-cli> wallet export export_path=/Users/home/backup export_key
+indy-cli> wallet close
+```
+2. Run new CLI and import wallet
+```
+indy-cli-rs> wallet import wallet_imported key export_path=/Users/home/backup export_key
+```
 
 ### Troubleshooting
 CLI depends on `term` rust library that has a system dependency on terminfo database.

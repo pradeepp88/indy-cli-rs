@@ -5,6 +5,7 @@
 */
 use crate::utils::environment::EnvironmentUtils;
 
+use crate::error::{CliError, CliResult};
 use serde_json::Value as JsonValue;
 use std::{
     fs,
@@ -20,43 +21,22 @@ pub struct WalletConfig {
     pub storage_config: Option<JsonValue>,
 }
 
-pub struct WalletDirectory {}
-
-impl WalletDirectory {
-    pub(crate) fn create(config: &WalletConfig) -> Result<(), std::io::Error> {
-        let path = EnvironmentUtils::wallet_path(&config.id);
-        Self::create_folder(&path)
-    }
-
-    pub(crate) fn delete(config: &WalletConfig) -> Result<(), std::io::Error> {
-        let path = EnvironmentUtils::wallet_path(&config.id);
-        if !path.exists() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Wallet \"{}\" does not exist", config.id),
-            ));
-        }
-        fs::remove_dir_all(path.as_path())
-    }
-
-    pub(crate) fn store_wallet_config(
-        id: &str,
-        config: &WalletConfig,
-    ) -> Result<(), std::io::Error> {
+impl WalletConfig {
+    pub fn store(&self) -> CliResult<()> {
         let path = EnvironmentUtils::wallets_path();
-        Self::create_folder(&path)?;
+        fs::DirBuilder::new().recursive(true).create(path)?;
 
-        let path = EnvironmentUtils::wallet_config_path(id);
+        let path = EnvironmentUtils::wallet_config_path(&self.id);
 
         let mut config_file = File::create(path)?;
-        let config_json = json!(config).to_string();
+        let config_json = json!(self).to_string();
         config_file.write_all(config_json.as_bytes())?;
         config_file.sync_all()?;
 
         Ok(())
     }
 
-    pub(crate) fn read_wallet_config(id: &str) -> Result<WalletConfig, std::io::Error> {
+    pub fn read(id: &str) -> CliResult<Self> {
         let path = EnvironmentUtils::wallet_config_path(id);
 
         let mut config_json = String::new();
@@ -68,13 +48,49 @@ impl WalletDirectory {
         Ok(config)
     }
 
-    pub(crate) fn delete_wallet_config(id: &str) -> Result<(), std::io::Error> {
-        let path = EnvironmentUtils::wallet_config_path(id);
-        fs::remove_file(path)
+    pub fn delete(&self) -> CliResult<()> {
+        let path = EnvironmentUtils::wallet_config_path(&self.id);
+        fs::remove_file(path).map_err(CliError::from)
     }
 
-    pub(crate) fn is_wallet_config_exist(id: &str) -> bool {
-        EnvironmentUtils::wallet_config_path(id).exists()
+    pub fn exists(&self) -> bool {
+        EnvironmentUtils::wallet_config_path(&self.id).exists()
+    }
+
+    pub fn init_dir(&self) -> CliResult<()> {
+        WalletDirectory::from_id(&self.id).init_dir()
+    }
+}
+
+pub struct WalletDirectory {
+    id: String,
+    path: PathBuf,
+}
+
+impl WalletDirectory {
+    pub fn from_id(id: &str) -> WalletDirectory {
+        let path = EnvironmentUtils::wallet_path(id);
+        WalletDirectory {
+            id: id.to_string(),
+            path,
+        }
+    }
+
+    pub fn init_dir(&self) -> CliResult<()> {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(&self.path)
+            .map_err(CliError::from)
+    }
+
+    pub(crate) fn delete(&self) -> CliResult<()> {
+        if !self.path.exists() {
+            return Err(CliError::NotFound(format!(
+                "Wallet \"{}\" does not exist",
+                self.id
+            )));
+        }
+        fs::remove_dir_all(self.path.as_path()).map_err(CliError::from)
     }
 
     pub fn list_wallets() -> Vec<JsonValue> {
@@ -99,9 +115,5 @@ impl WalletDirectory {
         }
 
         configs
-    }
-
-    fn create_folder(path: &PathBuf) -> Result<(), std::io::Error> {
-        fs::DirBuilder::new().recursive(true).create(path)
     }
 }

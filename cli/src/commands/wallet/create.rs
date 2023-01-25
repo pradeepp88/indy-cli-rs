@@ -6,10 +6,7 @@
 use crate::{
     command_executor::{Command, CommandContext, CommandMetadata, CommandParams},
     params_parser::ParamParser,
-    tools::wallet::{
-        directory::{WalletConfig, WalletDirectory},
-        Credentials, Wallet,
-    },
+    tools::wallet::{wallet_config::WalletConfig, Credentials, Wallet},
 };
 
 pub mod create_command {
@@ -61,7 +58,8 @@ pub mod create_command {
         Wallet::create(&config, &credentials)
             .map_err(|err| println_err!("{}", err.message(Some(&id))))?;
 
-        WalletDirectory::store_wallet_config(id, &config)
+        config
+            .store()
             .map_err(|err| println_err!("Cannot store wallet \"{}\" config file: {:?}", id, err))?;
 
         println_succ!("Wallet \"{}\" has been created", id);

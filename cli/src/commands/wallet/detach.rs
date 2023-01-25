@@ -8,11 +8,11 @@ use crate::{
         Command, CommandContext, CommandMetadata, CommandParams, DynamicCompletionType,
     },
     params_parser::ParamParser,
-    tools::wallet::directory::WalletDirectory,
 };
 
 pub mod detach_command {
     use super::*;
+    use crate::tools::wallet::wallet_config::WalletConfig;
 
     command!(
         CommandMetadata::build("detach", "Detach wallet from Indy CLI")
@@ -30,10 +30,8 @@ pub mod detach_command {
 
         let id = ParamParser::get_str_param("name", params)?;
 
-        if !WalletDirectory::is_wallet_config_exist(id) {
-            println_err!("Wallet \"{}\" isn't attached to CLI", id);
-            return Err(());
-        }
+        let config = WalletConfig::read(id)
+            .map_err(|_| println_err!("Wallet \"{}\" isn't attached to CLI", id))?;
 
         if let Some(wallet) = ctx.get_opened_wallet() {
             if wallet.name == id {
@@ -42,7 +40,8 @@ pub mod detach_command {
             }
         }
 
-        WalletDirectory::delete_wallet_config(id)
+        config
+            .delete()
             .map_err(|err| println_err!("Cannot delete \"{}\" config file: {:?}", id, err))?;
 
         println_succ!("Wallet \"{}\" has been deleted", id);

@@ -3,33 +3,70 @@
     https://www.dsr-corporation.com
     SPDX-License-Identifier: Apache-2.0
 */
-use std::{fs, path::PathBuf};
+use crate::error::{CliError, CliResult};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
-pub struct WalletBackup {}
+pub struct Backup {
+    path: PathBuf,
+}
 
-impl WalletBackup {
-    pub fn init_directory(path: &str) -> Result<(), std::io::Error> {
-        if PathBuf::from(path).exists() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                format!("Wallet backup \"{}\" already exists", path),
-            ));
+#[derive(Debug)]
+pub enum BackupKind {
+    Askar,
+    Libindy,
+}
+
+pub const DEFAULT_BACKUP_NAME: &'static str = "backup";
+
+impl Backup {
+    pub fn from_file(path: &str) -> CliResult<Self> {
+        let path = PathBuf::from(path);
+        Ok(Backup { path })
+    }
+
+    pub fn init_dir(&self) -> CliResult<()> {
+        if self.exists() {
+            return Err(CliError::Duplicate(format!(
+                "Wallet backup \"{}\" already exists",
+                self.path.to_string_lossy()
+            )));
         }
 
-        let path = PathBuf::from(path);
-        fs::DirBuilder::new().recursive(true).create(path)
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(&self.path)
+            .map_err(CliError::from)
     }
 
-    pub fn get_id(path: &str) -> String {
-        let path = PathBuf::from(path);
-        let id = path
+    pub fn id(&self) -> String {
+        self.path
             .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or("backup".to_string());
-        id
+            .and_then(OsStr::to_str)
+            .map(String::from)
+            .unwrap_or(DEFAULT_BACKUP_NAME.to_string())
     }
 
-    pub fn is_wallet_backup_exist(path: &str) -> bool {
-        PathBuf::from(path).exists()
+    pub fn exists(&self) -> bool {
+        self.path.exists()
+    }
+
+    pub fn kind(&self) -> CliResult<BackupKind> {
+        let metadata = fs::metadata(&self.path)?;
+        // if specified path to directory consider it as Askar backup
+        if metadata.is_dir() {
+            return Ok(BackupKind::Askar);
+        }
+
+        let extension = self.path.extension().and_then(OsStr::to_str);
+        match extension {
+            // if extension of backup file is `db` consider it as Askar backup
+            Some("db") => Ok(BackupKind::Askar),
+            // if specified path to directory consider it as Askar backup
+            None => Ok(BackupKind::Libindy),
+            _ => Err(CliError::Unsupported(format!(
+                "Unsupported wallet backup type {}",
+                self.path.to_string_lossy()
+            ))),
+        }
     }
 }

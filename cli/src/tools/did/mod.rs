@@ -23,7 +23,7 @@ use self::{
 
 pub struct Did {}
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DidInfo {
     pub did: String,
     pub verkey: String,
@@ -51,7 +51,7 @@ impl Did {
                 None => base58::encode(&verkey_bytes[0..16]),
             };
 
-            let existing_did = Self::fetch_record(store, &did, false).await?;
+            let existing_did = Self::get_opt_record(store, &did, false).await?;
             if existing_did.is_some() {
                 return Err(CliError::Duplicate(format!(
                     "DID already exits in the wallet"
@@ -90,11 +90,7 @@ impl Did {
 
     pub fn replace_keys_start(store: &Wallet, did: &str, seed: Option<&str>) -> CliResult<String> {
         block_on(async move {
-            let (did_entry, mut did_info) = Self::fetch_record(store, &did, true)
-                .await?
-                .ok_or_else(|| {
-                    CliError::NotFound(format!("DID {} does not exits in the wallet.", did))
-                })?;
+            let (did_entry, mut did_info) = Self::get_record(store, &did, true).await?;
 
             let key = Key::create(store, seed, None).await?;
             let verkey = key.verkey()?;
@@ -118,11 +114,7 @@ impl Did {
 
     pub fn replace_keys_apply(store: &Wallet, did: &str) -> CliResult<()> {
         block_on(async move {
-            let (did_entry, mut did_info) = Self::fetch_record(store, &did, true)
-                .await?
-                .ok_or_else(|| {
-                    CliError::NotFound(format!("DID {} does not exits in the wallet.", did))
-                })?;
+            let (did_entry, mut did_info) = Self::get_record(store, &did, true).await?;
 
             let next_verkey = did_info.next_verkey.ok_or_else(|| {
                 CliError::InvalidEntityState(format!("Next key is not set for the DID {}.", did))
@@ -148,11 +140,7 @@ impl Did {
 
     pub fn set_metadata(store: &Wallet, did: &str, metadata: &str) -> CliResult<()> {
         block_on(async move {
-            let (did_entry, mut did_info) = Self::fetch_record(store, &did, true)
-                .await?
-                .ok_or_else(|| {
-                    CliError::NotFound(format!("DID {} does not exits in the wallet.", did))
-                })?;
+            let (did_entry, mut did_info) = Self::get_record(store, &did, true).await?;
 
             did_info.metadata = Some(metadata.to_string());
 
@@ -173,19 +161,15 @@ impl Did {
 
     pub fn get(store: &Wallet, did: &DidValue) -> CliResult<DidInfo> {
         block_on(async move {
-            Self::fetch_record(store, &did.to_string(), true)
-                .await?
-                .map(|(_, did_info)| did_info)
-                .ok_or_else(|| {
-                    CliError::NotFound(format!("DID {} does not exits in the wallet.", did))
-                })
+            let (_, did_info) = Self::get_record(store, &did, true).await?;
+            Ok(did_info)
         })
     }
 
     pub fn list(store: &Wallet) -> CliResult<Vec<DidInfo>> {
         block_on(async move {
             store
-                .fetch_all_record(CATEGORY_DID)
+                .fetch_all_records(CATEGORY_DID)
                 .await?
                 .iter()
                 .map(|did| serde_json::from_slice(&did.value).map_err(CliError::from))
@@ -202,7 +186,7 @@ impl Did {
 
     pub fn qualify(store: &Wallet, did: &DidValue, method: &str) -> CliResult<DidValue> {
         block_on(async {
-            let (entry, did_info) = Self::fetch_record(store, &did.to_string(), true)
+            let (entry, did_info) = Self::get_opt_record(store, &did.to_string(), true)
                 .await?
                 .ok_or_else(|| {
                     CliError::NotFound(format!("DID {} does not exits in the wallet!", did))
@@ -229,11 +213,7 @@ impl Did {
     }
 
     pub async fn sign(store: &Wallet, did: &str, bytes: &[u8]) -> CliResult<Vec<u8>> {
-        let (_, did_info) = Self::fetch_record(store, &did, true)
-            .await?
-            .ok_or_else(|| {
-                CliError::NotFound(format!("DID {} does not exits in the wallet!", did))
-            })?;
+        let (_, did_info) = Self::get_record(store, &did, true).await?;
 
         Key::sign(store, &did_info.verkey, bytes).await
     }
@@ -242,7 +222,19 @@ impl Did {
         store.remove_record(CATEGORY_DID, name).await
     }
 
-    async fn fetch_record(
+    pub async fn get_record(
+        store: &Wallet,
+        name: &str,
+        for_update: bool,
+    ) -> CliResult<(Entry, DidInfo)> {
+        Self::get_opt_record(store, name, for_update)
+            .await?
+            .ok_or_else(|| {
+                CliError::NotFound(format!("DID {} does not exits in the wallet.", name))
+            })
+    }
+
+    async fn get_opt_record(
         store: &Wallet,
         name: &str,
         for_update: bool,
