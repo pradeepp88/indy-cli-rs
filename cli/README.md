@@ -9,6 +9,21 @@ It provides the commands to:
 * Manage DIDs
 * Sending transactions to distributed ledger
 
+### Table of contents
+* [Installation](#installation)
+* [Execution modes](#execution-modes)
+* [Getting help](#getting-help)
+* [Options](#options)
+* [Compatibility with old Indy-CLI](#compatibility-with-old-indy-cli)
+* [Migration of a wallet created by old Indy-CLI](#migration-of-a-wallet-created-by-old-indy-cli)
+* [Troubleshooting](#troubleshooting)
+
+### Installation
+1. Go to the [Github Releases](https://github.com/hyperledger/indy-cli-rs/releases) page.
+1. Download archive with the last version of CLI depending on your system platform.
+1. Unzip archive to the directory where you want to save CLI.
+1. After unzip you will be able to execute binary file.
+
 ### Execution modes
 CLI supports 2 execution modes:
 * Interactive:
@@ -35,14 +50,14 @@ CLI supports 2 execution modes:
     * taaAcceptanceMechanism - transaction author agreement acceptance mechanism to be used when sending write transactions to the Ledger.
 * --plugins - **DEPRECATED** Load plugins in Libindy (usage: <lib-1-name>:<init-func-1-name>,...,<lib-n-name>:<init-func-n-name>).
 
-### Compatibility with [Indy-CLI](https://github.com/hyperledger/indy-sdk/tree/main/cli)
+### Compatibility with old Indy-CLI.
 * The names and parameters for all commands are preserved compared to the **old** Indy-CLI.
 * Payment related commands and functionality are **not** included into **this** CLI.
 * Pool Ledger created by the **old** Indy-CLI **can** be also opened using **this** CLI.
 * Wallet created by the **old** Indy-CLI **cannot** be opened using **this** CLI due to different storage format.
 * Wallet backup created by the **old** Indy-CLI **can** be imported using **this** CLI due to different backup format.
 
-### Migration of wallet created by old [Indy-CLI](https://github.com/hyperledger/indy-sdk/tree/main/cli)
+### Migration of a wallet created by old Indy-CLI
 1. Run old CLI and create wallet backup
 ```
 indy-cli> wallet open wallet_to_export key
