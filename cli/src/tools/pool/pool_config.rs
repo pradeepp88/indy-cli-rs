@@ -7,6 +7,7 @@ use crate::{
     error::{CliError, CliResult},
     utils::environment::EnvironmentUtils,
 };
+use std::path::PathBuf;
 use std::{
     fs,
     fs::File,
@@ -19,16 +20,24 @@ pub struct PoolConfig {
     pub genesis_txn: String,
 }
 
-pub struct PoolDirectory {}
+pub struct PoolDirectory {
+    pub name: String,
+}
 
 impl PoolDirectory {
-    pub(crate) fn store_pool_config(name: &str, config: &PoolConfig) -> CliResult<()> {
-        let mut path = EnvironmentUtils::pool_path(name);
+    pub(crate) fn from(name: &str) -> Self {
+        PoolDirectory {
+            name: name.to_string(),
+        }
+    }
+
+    pub(crate) fn store_config(&self, config: &PoolConfig) -> CliResult<()> {
+        let mut path = self.path();
 
         if path.as_path().exists() {
             return Err(CliError::Duplicate(format!(
                 "Pool {} already exists!",
-                name
+                &self.name
             )));
         }
 
@@ -36,7 +45,7 @@ impl PoolDirectory {
 
         // copy genesis transactions
         {
-            path.push(name);
+            path.push(&self.name);
             path.set_extension("txn");
 
             let mut gt_fin = File::open(&config.genesis_txn)?;
@@ -62,8 +71,8 @@ impl PoolDirectory {
         Ok(())
     }
 
-    pub(crate) fn read_pool_config(id: &str) -> CliResult<PoolConfig> {
-        let path = EnvironmentUtils::pool_config_path(id);
+    pub(crate) fn read_config(&self) -> CliResult<PoolConfig> {
+        let path = EnvironmentUtils::pool_config_path(&self.name);
 
         let mut config_json = String::new();
 
@@ -74,12 +83,12 @@ impl PoolDirectory {
         Ok(config)
     }
 
-    pub(crate) fn delete_pool_config(name: &str) -> CliResult<()> {
-        let path = EnvironmentUtils::pool_path(name);
+    pub(crate) fn delete_config(&self) -> CliResult<()> {
+        let path = self.path();
         if !path.as_path().exists() {
             return Err(CliError::NotFound(format!(
                 "Pool \"{}\" does not exist.",
-                name
+                &self.name
             )));
         }
         fs::remove_dir_all(path).map_err(CliError::from)
@@ -111,10 +120,14 @@ impl PoolDirectory {
         Ok(pools)
     }
 
-    pub(crate) fn store_pool_transactions(name: &str, transactions: &Vec<String>) -> CliResult<()> {
-        let path = EnvironmentUtils::pool_transactions_path(name);
+    pub(crate) fn store_pool_transactions(&self, transactions: &Vec<String>) -> CliResult<()> {
+        let path = EnvironmentUtils::pool_transactions_path(&self.name);
         let mut f = File::create(path.as_path())?;
         f.write_all(transactions.join("\n").as_bytes())?;
         Ok(())
+    }
+
+    fn path(&self) -> PathBuf {
+        EnvironmentUtils::pool_path(&self.name)
     }
 }

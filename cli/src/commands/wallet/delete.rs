@@ -8,7 +8,7 @@ use crate::{
         Command, CommandContext, CommandMetadata, CommandParams, DynamicCompletionType,
     },
     params_parser::ParamParser,
-    tools::wallet::{Credentials, Wallet, wallet_config::WalletConfig},
+    tools::wallet::{wallet_config::WalletConfig, Credentials, Wallet},
     wallet::close_wallet,
 };
 

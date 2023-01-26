@@ -11,7 +11,7 @@ use crate::{
 
 pub mod create_command {
     use super::*;
-    use crate::tools::pool::directory::PoolConfig;
+    use crate::tools::pool::pool_config::PoolConfig;
 
     command!(CommandMetadata::build(
         "create",

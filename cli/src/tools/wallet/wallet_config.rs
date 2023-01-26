@@ -22,43 +22,47 @@ pub struct WalletConfig {
 }
 
 impl WalletConfig {
-    pub fn store(&self) -> CliResult<()> {
-        let path = EnvironmentUtils::wallets_path();
-        fs::DirBuilder::new().recursive(true).create(path)?;
+    pub(crate) fn store(&self) -> CliResult<()> {
+        Self::create_wallets_directory()?;
 
-        let path = EnvironmentUtils::wallet_config_path(&self.id);
-
-        let mut config_file = File::create(path)?;
+        let mut config_file = File::create(&self.path())?;
         let config_json = json!(self).to_string();
         config_file.write_all(config_json.as_bytes())?;
         config_file.sync_all()?;
-
         Ok(())
     }
 
-    pub fn read(id: &str) -> CliResult<Self> {
+    pub(crate) fn read(id: &str) -> CliResult<Self> {
         let path = EnvironmentUtils::wallet_config_path(id);
 
         let mut config_json = String::new();
-
         let mut file = File::open(path)?;
         file.read_to_string(&mut config_json)?;
 
-        let config = serde_json::from_str(&config_json)?;
-        Ok(config)
+        serde_json::from_str(&config_json).map_err(CliError::from)
     }
 
-    pub fn delete(&self) -> CliResult<()> {
-        let path = EnvironmentUtils::wallet_config_path(&self.id);
-        fs::remove_file(path).map_err(CliError::from)
+    pub(crate) fn delete(&self) -> CliResult<()> {
+        fs::remove_file(&self.path()).map_err(CliError::from)
     }
 
-    pub fn exists(&self) -> bool {
-        EnvironmentUtils::wallet_config_path(&self.id).exists()
+    pub(crate) fn exists(&self) -> bool {
+        self.path().exists()
     }
 
-    pub fn init_dir(&self) -> CliResult<()> {
-        WalletDirectory::from_id(&self.id).init_dir()
+    pub(crate) fn create_path(&self) -> CliResult<()> {
+        WalletDirectory::from_id(&self.id).create()
+    }
+
+    fn path(&self) -> PathBuf {
+        EnvironmentUtils::wallet_config_path(&self.id)
+    }
+
+    pub(crate) fn create_wallets_directory() -> CliResult<()> {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(EnvironmentUtils::wallets_path())
+            .map_err(CliError::from)
     }
 }
 
@@ -68,7 +72,7 @@ pub struct WalletDirectory {
 }
 
 impl WalletDirectory {
-    pub fn from_id(id: &str) -> WalletDirectory {
+    pub(crate) fn from_id(id: &str) -> WalletDirectory {
         let path = EnvironmentUtils::wallet_path(id);
         WalletDirectory {
             id: id.to_string(),
@@ -76,7 +80,7 @@ impl WalletDirectory {
         }
     }
 
-    pub fn init_dir(&self) -> CliResult<()> {
+    pub(crate) fn create(&self) -> CliResult<()> {
         fs::DirBuilder::new()
             .recursive(true)
             .create(&self.path)
@@ -93,7 +97,7 @@ impl WalletDirectory {
         fs::remove_dir_all(self.path.as_path()).map_err(CliError::from)
     }
 
-    pub fn list_wallets() -> Vec<JsonValue> {
+    pub(crate) fn list_wallets() -> Vec<JsonValue> {
         let mut configs: Vec<JsonValue> = Vec::new();
 
         if let Ok(entries) = fs::read_dir(EnvironmentUtils::wallets_path()) {

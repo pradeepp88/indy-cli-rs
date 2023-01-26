@@ -57,17 +57,8 @@ impl Did {
                     "DID already exits in the wallet"
                 )));
             }
-
-            let mut tags = vec![
-                EntryTag::Encrypted("verkey".to_string(), verkey.to_string()),
-                EntryTag::Encrypted("verkey_type".to_string(), KEY_TYPE.to_string()),
-            ];
             if let Some(method) = method {
                 did = DidValue(did.to_string()).to_qualified(method)?.to_string();
-                tags.push(EntryTag::Encrypted(
-                    "method".to_string(),
-                    method.to_string(),
-                ))
             }
 
             let did_info = DidInfo {
@@ -79,9 +70,14 @@ impl Did {
                 next_verkey: None,
             };
 
-            let value = serde_json::to_vec(&did_info)?;
             store
-                .store_record(CATEGORY_DID, &did_info.did, &value, Some(&tags), true)
+                .store_record(
+                    CATEGORY_DID,
+                    &did_info.did,
+                    &did_info.to_bytes()?,
+                    Some(&did_info.tags()),
+                    true,
+                )
                 .await?;
 
             Ok((did, verkey))
@@ -247,5 +243,30 @@ impl Did {
             }
             None => Ok(None),
         }
+    }
+}
+
+impl DidInfo {
+    pub fn from_bytes(bytes: &[u8]) -> CliResult<Self> {
+        serde_json::from_slice(bytes)
+            .map_err(|_| CliError::InvalidInput("Unable to parse did info".to_string()))
+    }
+
+    pub fn to_bytes(&self) -> CliResult<Vec<u8>> {
+        serde_json::to_vec(self).map_err(CliError::from)
+    }
+
+    pub fn tags(&self) -> Vec<EntryTag> {
+        let mut tags = vec![
+            EntryTag::Encrypted("verkey".to_string(), self.verkey.to_string()),
+            EntryTag::Encrypted("verkey_type".to_string(), KEY_TYPE.to_string()),
+        ];
+        if let Some(ref method) = self.method {
+            tags.push(EntryTag::Encrypted(
+                "method".to_string(),
+                method.to_string(),
+            ))
+        }
+        tags
     }
 }

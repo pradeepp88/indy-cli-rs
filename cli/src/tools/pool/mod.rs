@@ -9,13 +9,13 @@ use crate::{
 };
 use std::collections::HashMap;
 
-use directory::{PoolConfig, PoolDirectory};
 use indy_vdr::{
     config::PoolConfig as OpenPoolConfig,
     pool::{helpers::perform_refresh, LocalPool, Pool as PoolImpl, PoolBuilder, PoolTransactions},
 };
+use pool_config::{PoolConfig, PoolDirectory};
 
-pub mod directory;
+pub mod pool_config;
 
 pub struct Pool {
     pub pool: LocalPool,
@@ -24,7 +24,9 @@ pub struct Pool {
 
 impl Pool {
     pub fn create(name: &str, config: &PoolConfig) -> CliResult<()> {
-        PoolDirectory::store_pool_config(name, config).map_err(CliError::from)
+        PoolDirectory::from(name)
+            .store_config(config)
+            .map_err(CliError::from)
     }
 
     pub fn open(
@@ -32,7 +34,8 @@ impl Pool {
         config: OpenPoolConfig,
         pre_ordered_nodes: Option<Vec<&str>>,
     ) -> CliResult<Pool> {
-        let pool_transactions_file = PoolDirectory::read_pool_config(name)
+        let pool_transactions_file = PoolDirectory::from(name)
+            .read_config()
             .map_err(|_| CliError::NotFound(format!("Pool \"{}\" does not exist.", name)))?
             .genesis_txn;
 
@@ -68,10 +71,8 @@ impl Pool {
                     .transactions(transactions)?
                     .into_local()?;
 
-                PoolDirectory::store_pool_transactions(
-                    &self.name,
-                    &self.pool.get_json_transactions()?,
-                )?;
+                PoolDirectory::from(&self.name)
+                    .store_pool_transactions(&self.pool.get_json_transactions()?)?;
 
                 Ok(Some(Pool {
                     pool,
@@ -91,6 +92,8 @@ impl Pool {
     }
 
     pub fn delete(name: &str) -> CliResult<()> {
-        PoolDirectory::delete_pool_config(name).map_err(CliError::from)
+        PoolDirectory::from(name)
+            .delete_config()
+            .map_err(CliError::from)
     }
 }

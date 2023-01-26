@@ -4,6 +4,7 @@
     SPDX-License-Identifier: Apache-2.0
 */
 
+use aries_askar::crypto::kdf::argon2::SALT_LENGTH;
 use aries_askar::{
     crypto::{
         alg::chacha20::{Chacha20Key, C20P},
@@ -19,6 +20,7 @@ use aries_askar::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use dryoc::utils::sodium_increment;
 use indy_utils::{base58, hash::SHA256};
+use serde::Deserialize;
 use std::{
     cmp,
     collections::HashMap,
@@ -37,6 +39,10 @@ pub struct LibindyBackupReader {
     reader: Reader<BufReader<File>>,
 }
 
+const TAGBYTES: usize = 16;
+const HASHBYTES: usize = 32;
+const KEYBYTES: usize = 32;
+
 impl LibindyBackupReader {
     pub fn init(config: &ImportConfig) -> CliResult<LibindyBackupReader> {
         let backup_file = fs::OpenOptions::new()
@@ -51,13 +57,13 @@ impl LibindyBackupReader {
         let (key, nonce, chunk_size, header_bytes) =
             Self::read_backup_header(&mut reader, &config)?;
 
-        let mut backup_handler = LibindyBackupReader {
+        let mut backup_reader = LibindyBackupReader {
             reader: Reader::new(reader, key, nonce, chunk_size)?,
         };
 
-        backup_handler.validate_backup_header(&header_bytes)?;
+        backup_reader.validate_backup_header(&header_bytes)?;
 
-        Ok(backup_handler)
+        Ok(backup_reader)
     }
 
     pub fn read_record(&mut self) -> CliResult<Option<BackupRecord>> {
@@ -162,7 +168,7 @@ impl LibindyBackupReader {
     }
 
     fn validate_backup_header(&mut self, header_bytes: &[u8]) -> CliResult<()> {
-        let mut header_hash = vec![0u8; 32];
+        let mut header_hash = vec![0u8; HASHBYTES];
         self.reader.read_exact(&mut header_hash)?;
         if SHA256::digest(header_bytes) != header_hash {
             return Err(CliError::InvalidInput(
@@ -175,9 +181,9 @@ impl LibindyBackupReader {
     fn derive_backup_key(passphrase: &[u8], salt: &[u8], params: Params) -> CliResult<Vec<u8>> {
         // **Libindy ISSUE**: For backup purpose Libindy generates Salt of 32 bytes length.
         // BUT in fact salt is truncated till 16 bytes for key derivation.
-        let salt = &salt[0..16];
+        let salt = &salt[0..SALT_LENGTH];
 
-        let mut key = [0u8; 32];
+        let mut key = [0u8; KEYBYTES];
         Argon2::new(passphrase, salt, params)
             .map_err(|_| {
                 CliError::InvalidInput(
@@ -212,7 +218,7 @@ impl<R: Read> Reader<R> {
         })?;
         Ok(Reader {
             rest_buffer: Vec::new(),
-            chunk_buffer: vec![0; chunk_size + 16], // TAGBYTES
+            chunk_buffer: vec![0; chunk_size + TAGBYTES],
             key,
             nonce,
             inner,
@@ -331,10 +337,34 @@ pub struct DidRecord {
     pub verkey: String,
 }
 
+pub trait LibindyBackupRecord {
+    const TYPE: &'static str;
+
+    fn from_str<'a>(json: &'a str) -> CliResult<Self>
+    where
+        Self: Deserialize<'a>,
+    {
+        serde_json::from_str(json).map_err(|_| {
+            CliError::InvalidInput(format!(
+                "Invalid backup content: Unable to parse {} record",
+                Self::TYPE
+            ))
+        })
+    }
+}
+
+impl LibindyBackupRecord for DidRecord {
+    const TYPE: &'static str = "Indy::Did";
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TemporaryDidRecord {
     pub did: String,
     pub verkey: String,
+}
+
+impl LibindyBackupRecord for TemporaryDidRecord {
+    const TYPE: &'static str = "Indy::TemporaryDid";
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -343,7 +373,25 @@ pub struct KeyRecord {
     pub signkey: String,
 }
 
+impl LibindyBackupRecord for KeyRecord {
+    const TYPE: &'static str = "Indy::Key";
+}
+
+impl KeyRecord {
+    pub fn key_bytes(&self) -> CliResult<Vec<u8>> {
+        base58::decode(&self.signkey)
+            .map_err(|_| {
+                CliError::InvalidInput("Invalid backup content: Unable to decode key".to_string())
+            })
+            .map_err(CliError::from)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DidMetadataRecord {
     pub value: String,
+}
+
+impl LibindyBackupRecord for DidMetadataRecord {
+    const TYPE: &'static str = "Indy::DidMetadata";
 }

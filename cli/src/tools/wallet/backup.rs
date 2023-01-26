@@ -6,7 +6,7 @@
 use crate::error::{CliError, CliResult};
 use std::{ffi::OsStr, fs, path::PathBuf};
 
-pub struct Backup {
+pub struct WalletBackup {
     path: PathBuf,
 }
 
@@ -18,10 +18,10 @@ pub enum BackupKind {
 
 pub const DEFAULT_BACKUP_NAME: &'static str = "backup";
 
-impl Backup {
+impl WalletBackup {
     pub fn from_file(path: &str) -> CliResult<Self> {
         let path = PathBuf::from(path);
-        Ok(Backup { path })
+        Ok(WalletBackup { path })
     }
 
     pub fn init_dir(&self) -> CliResult<()> {

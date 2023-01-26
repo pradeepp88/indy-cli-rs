@@ -244,7 +244,7 @@ impl Ledger {
         force: bool,
     ) -> CliResult<PreparedRequest> {
         Self::_request_builder(pool)
-            .build_pool_config(submitter_did, writes, force)
+            .build_pool_config_request(submitter_did, writes, force)
             .map_err(CliError::from)
     }
 
@@ -255,7 +255,7 @@ impl Ledger {
         datetime: Option<&str>,
     ) -> CliResult<PreparedRequest> {
         Self::_request_builder(pool)
-            .build_pool_restart(submitter_did, action, datetime)
+            .build_pool_restart_request(submitter_did, action, datetime)
             .map_err(CliError::from)
     }
 
@@ -281,7 +281,7 @@ impl Ledger {
         };
 
         Self::_request_builder(pool)
-            .build_pool_upgrade(
+            .build_pool_upgrade_request(
                 submitter_did,
                 name,
                 version,
@@ -481,7 +481,7 @@ impl Ledger {
         ledgers_ids: Vec<u64>,
     ) -> CliResult<PreparedRequest> {
         Self::_request_builder(pool)
-            .build_ledger_freeze_request(submitter_did, &ledgers_ids)
+            .build_ledgers_freeze_request(submitter_did, &ledgers_ids)
             .map_err(CliError::from)
     }
 
