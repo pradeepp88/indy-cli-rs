@@ -66,9 +66,7 @@ pub mod rotate_key_command {
                         let temp_verkey = Did::abbreviate_verkey(&did, &temp_verkey)
                             .map_err(|_e| println_err!("Invalid temp verkey: {}", temp_verkey))?;
                         let curr_verkey =
-                            Did::abbreviate_verkey(&did, &curr_verkey).map_err(|_e| {
-                                println_err!("Invalid current verkey: {}", curr_verkey)
-                            })?;
+                            Did::abbreviate_verkey(&did, &curr_verkey).unwrap_or(curr_verkey);
                         Ok((temp_verkey, curr_verkey))
                     } else {
                         Ok((temp_verkey, curr_verkey))
@@ -124,8 +122,7 @@ pub mod rotate_key_command {
         Did::replace_keys_apply(&store, &did)
             .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let vk = Did::abbreviate_verkey(&did, &new_verkey)
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        let vk = Did::abbreviate_verkey(&did, &new_verkey).unwrap_or(new_verkey);
 
         println_succ!("Verkey for did \"{}\" has been updated", did);
         println_succ!("New verkey is \"{}\"", vk);

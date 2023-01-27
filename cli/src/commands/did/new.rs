@@ -40,8 +40,7 @@ pub mod new_command {
         let (did, vk) = Did::create(&store, did, seed, metadata, method)
             .map_err(|err| println_err!("{}", err.message(None)))?;
 
-        let vk = Did::abbreviate_verkey(&did, &vk)
-            .map_err(|err| println_err!("{}", err.message(None)))?;
+        let vk = Did::abbreviate_verkey(&did, &vk).unwrap_or(vk);
 
         println_succ!("Did \"{}\" has been created with \"{}\" verkey", did, vk);
 

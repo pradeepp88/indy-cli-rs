@@ -25,7 +25,7 @@ pub mod list_command {
 
         for did_info in dids.iter_mut() {
             did_info.verkey = Did::abbreviate_verkey(&did_info.did, &did_info.verkey)
-                .unwrap_or_else(|_| did_info.did.clone());
+                .unwrap_or_else(|_| did_info.verkey.clone());
         }
 
         print_list_table(

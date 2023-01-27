@@ -53,10 +53,15 @@ impl Pool {
             .node_weights(weight_nodes)
             .into_local()?;
 
-        Ok(Pool {
+        let pool = Pool {
             pool,
             name: name.to_string(),
-        })
+        };
+
+        pool.refresh()
+            .map_err(|_| CliError::NotFound(format!("Unable to connect to pool \"{}\"", name)))?;
+
+        Ok(pool)
     }
 
     pub fn refresh(&self) -> CliResult<Option<Pool>> {
