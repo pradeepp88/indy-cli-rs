@@ -55,7 +55,7 @@ CLI supports 2 execution modes:
 * Payment related commands and functionality are **not** included into **this** CLI.
 * Pool Ledger created by the **old** Indy-CLI **can** be also opened using **this** CLI.
 * Wallet created by the **old** Indy-CLI **cannot** be opened using **this** CLI due to different storage format.
-* Wallet backup created by the **old** Indy-CLI **can** be imported using **this** CLI due to different backup format.
+* Wallet backup created by the **old** Indy-CLI **can** be imported using **this** CLI.
 
 ### Migration of a wallet created by old Indy-CLI
 1. Run old CLI and create wallet backup
