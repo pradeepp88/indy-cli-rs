@@ -24,7 +24,7 @@ jobs:
       already_in_crates_io: ${{ steps.check_in_crates_io.outputs.already_in_crates_io != '' }}
     defaults:
       run:
-        working-directory: cli
+        working-directory: .
 
     steps:
       - uses: actions/checkout@v3
@@ -89,7 +89,7 @@ jobs:
     needs: [ checks, create_release ]
     defaults:
       run:
-        working-directory: cli
+        working-directory: .
 
     steps:
       - uses: actions/checkout@v3
@@ -157,7 +157,7 @@ jobs:
             toolchain: beta
     defaults:
       run:
-        working-directory: cli
+        working-directory: .
     env:
       asset_name: indy-cli-rs-${{ needs.checks.outputs.current_version }}-${{ matrix.arch }}.tar.gz
 
@@ -204,7 +204,7 @@ jobs:
         uses: a7ul/tar-action@v1.1.2
         with:
           command: c
-          cwd: cli/release-assets
+          cwd: ./release-assets
           files: .
           outPath: "indy-cli-rs.tar.gz"
 
