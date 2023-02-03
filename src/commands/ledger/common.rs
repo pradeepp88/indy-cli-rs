@@ -69,7 +69,7 @@ macro_rules! send_request {
         } else {
             let request_json = json!(&$request.req_json).to_string();
             println_succ!("Transaction has been created:");
-            println!("     {:?}", request_json);
+            println!("     {}", request_json);
             $ctx.set_context_transaction(Some(request_json));
             return Ok(());
         }

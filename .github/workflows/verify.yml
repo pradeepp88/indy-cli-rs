@@ -81,7 +81,7 @@ jobs:
         # See https://github.com/actions/runner-images/issues/1143
         if: matrix.os != 'windows-latest'
         run: |
-          docker build -f ../ci/indy-pool.dockerfile -t test_pool ../ci
+          docker build -f ./ci/indy-pool.dockerfile -t test_pool ./ci
           docker run -d --name indy_pool -p 9701-9708:9701-9708 test_pool
 
       - name: Run tests

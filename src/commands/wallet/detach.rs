@@ -43,7 +43,7 @@ pub mod detach_command {
             .delete()
             .map_err(|err| println_err!("Cannot delete \"{}\" config file: {:?}", id, err))?;
 
-        println_succ!("Wallet \"{}\" has been deleted", id);
+        println_succ!("Wallet \"{}\" has been detached", id);
 
         trace!("execute << ");
         Ok(())

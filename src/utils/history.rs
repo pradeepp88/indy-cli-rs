@@ -1,17 +1,14 @@
+use linefeed::{Interface, Terminal};
 use std::fs::DirBuilder;
-use linefeed::{Terminal, Interface};
 
-use crate::utils::{
-    environment::EnvironmentUtils,
-    file::{read_lines_from_file},
-};
+use crate::utils::{environment::EnvironmentUtils, file::read_lines_from_file};
 
 const HISTORY_SIZE: usize = 100;
 const SECRET_DATA: [&str; 2] = [" seed=", " key="];
 
 pub fn load<T>(reader: &mut Interface<T>) -> Result<(), String>
-    where
-        T: Terminal,
+where
+    T: Terminal,
 {
     reader.set_history_size(HISTORY_SIZE);
 
@@ -26,8 +23,8 @@ pub fn load<T>(reader: &mut Interface<T>) -> Result<(), String>
 }
 
 pub fn add<T>(line: &str, reader: &Interface<T>) -> Result<(), String>
-    where
-        T: Terminal,
+where
+    T: Terminal,
 {
     let has_secrets = SECRET_DATA
         .iter()
@@ -40,8 +37,8 @@ pub fn add<T>(line: &str, reader: &Interface<T>) -> Result<(), String>
 }
 
 pub fn persist<T>(reader: &Interface<T>) -> Result<(), String>
-    where
-        T: Terminal,
+where
+    T: Terminal,
 {
     let path = EnvironmentUtils::history_file_path();
     if let Some(parent_path) = path.parent() {
@@ -53,7 +50,8 @@ pub fn persist<T>(reader: &Interface<T>) -> Result<(), String>
         }
     }
 
-    reader.save_history(path)
+    reader
+        .save_history(path)
         .map_err(|err| format!("Can't store CLI history into the file: {}", err))?;
     Ok(())
 }

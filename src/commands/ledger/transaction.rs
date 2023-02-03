@@ -28,7 +28,7 @@ pub mod save_transaction_command {
 
         let transaction = ctx.ensure_context_transaction()?;
 
-        println!("Transaction: {:?}.", transaction);
+        println!("Transaction: {}.", transaction);
         println!("Would you like to save it? (y/n)");
 
         let save_transaction = crate::command_executor::wait_for_user_reply(ctx);
@@ -39,7 +39,7 @@ pub mod save_transaction_command {
         }
 
         write_file(file, &transaction)
-            .map_err(|err| println_err!("Cannot wallet transaction into the file: {:?}", err))?;
+            .map_err(|err| println_err!("Cannot save transaction into the file: {:?}", err))?;
 
         println_succ!("The transaction has been saved.");
 
@@ -61,7 +61,7 @@ pub mod load_transaction_command {
 
     command!(CommandMetadata::build(
         "load-transaction",
-        "Read transaction from a file and wallet it into CLI context."
+        "Read transaction from a file and store it into CLI context."
     )
     .add_required_param("file", "The path to file containing a transaction to load.")
     .add_example(r#"ledger load-transaction /home/transaction.txt"#)
