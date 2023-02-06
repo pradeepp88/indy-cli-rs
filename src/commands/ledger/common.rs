@@ -82,7 +82,7 @@ macro_rules! get_transaction_to_use {
             PreparedRequest::from_request_json(&txn_)
                 .map_err(|_| println_err!("Invalid formatted transaction provided."))?
         } else if let Some(txn_) = $ctx.get_context_transaction() {
-            println!("Transaction stored into context: {:?}.", txn_);
+            println!("Transaction stored into context: {}.", txn_);
             println!("Would you like to use it? (y/n)");
 
             let use_transaction = crate::command_executor::wait_for_user_reply($ctx);

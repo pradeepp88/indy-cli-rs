@@ -1,7 +1,6 @@
 /*
-    Copyright 2023 DSR Corporation, Denver, Colorado.
-    https://www.dsr-corporation.com
-    SPDX-License-Identifier: Apache-2.0
+    Copyright © 2023 Province of British Columbia
+    https://digital.gov.bc.ca/digital-trust
 */
 use crate::{
     command_executor::{Command, CommandContext, CommandMetadata, CommandParams},

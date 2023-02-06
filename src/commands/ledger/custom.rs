@@ -38,7 +38,7 @@ pub mod custom_command {
 
             match context_txn {
                 Some(txn_) => {
-                    println!("Transaction stored into context: {:?}.", txn_);
+                    println!("Transaction stored into context: {}.", txn_);
                     println!("Would you like to send it? (y/n)");
 
                     let use_transaction = crate::command_executor::wait_for_user_reply(ctx);

@@ -1,6 +1,5 @@
-# Copyright 2023 DSR Corporation, Denver, Colorado.
-# https://www.dsr-corporation.com
-# SPDX-License-Identifier: Apache-2.0
+# Copyright © 2023 Province of British Columbia
+# https://digital.gov.bc.ca/digital-trust
 
 name: Release
 
@@ -74,12 +73,12 @@ jobs:
     steps:
       - name: Create GitHub Release
         if: ${{ !needs.checks.outputs.existing_release_info }}
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ needs.checks.outputs.current_version }}
-          release_name: v${{ needs.checks.outputs.current_version }}
+          name: v${{ needs.checks.outputs.current_version }}
 
   publish_crate:
     name: Publish crate
