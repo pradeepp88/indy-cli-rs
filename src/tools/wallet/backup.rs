@@ -60,12 +60,8 @@ impl WalletBackup {
         match extension {
             // if extension of backup file is `db` consider it as Askar backup
             Some("db") => Ok(BackupKind::Askar),
-            // if specified path to directory consider it as Askar backup
-            None => Ok(BackupKind::Libindy),
-            _ => Err(CliError::Unsupported(format!(
-                "Unsupported wallet backup type {}",
-                self.path.to_string_lossy()
-            ))),
+            // else consider it as a Libindy backup
+            _ => Ok(BackupKind::Libindy),
         }
     }
 }
