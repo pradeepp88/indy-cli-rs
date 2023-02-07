@@ -26,7 +26,7 @@ pub mod about_command {
         println!();
         println_succ!("Version: {}", env!("CARGO_PKG_VERSION"));
         println_succ!("Apache License Version 2.0");
-        println_succ!("Copyright 2023 Hyperledger Aries");
+        println_succ!("Copyright © 2023 Province of British Columbia");
         println!();
 
         let res = Ok(());
