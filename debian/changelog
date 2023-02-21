@@ -1,0 +1,6 @@
+indy-cli-rs (0.1.0) unstable; urgency=medium
+
+[ Hyperledger ]
+
+* 0.1.0
+    * Initial release - use Aries Shared components instead of Libindy.

@@ -1,0 +1,90 @@
+# Copyright © 2023 Province of British Columbia
+# https://digital.gov.bc.ca/digital-trust
+
+name: Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+
+jobs:
+
+  release-ready:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get current version
+        id: current_version
+        run: |
+          version="$(cargo -q metadata --no-deps \
+            | jq -r '.packages[] | select(.name == "indy-cli-rs") | .version')"
+          echo "current_version=$version" >> $GITHUB_OUTPUT
+          echo "$version"
+
+      - name: Check version format
+        run: |
+          # verify the version has "MAJOR.MINOR.PATCH" parts only
+          echo "${{ steps.current_version.outputs.current_version }}" | grep -e '^[0-9]\+\.[0-9]\+\.[0-9]\+$'
+
+        # Uncomment when all dependencies are published
+#      - name: Check it can be packaged
+#        run: |
+#          cargo package
+#          # TODO verify that it's not more than crates.io limit (10 MB)
+#          ls -la target/package
+#          cargo package --list
+
+  verify:
+    strategy:
+      matrix:
+        os: [ macos-latest, windows-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo resources
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo check
+        run: cargo check
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Debug build
+        run: cargo build --verbose
+
+      - name: Install docker (Mac OS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install docker
+          colima start --network-address
+
+      - name: Run node pool
+        # Currently, Windows runner does not support Linux containers in Docker
+        # See https://github.com/actions/runner-images/issues/1143
+        if: matrix.os != 'windows-latest'
+        run: |
+          docker build -f ./ci/indy-pool.dockerfile -t test_pool ./ci
+          docker run -d --name indy_pool -p 9701-9708:9701-9708 test_pool
+
+      - name: Run tests
+        if: matrix.os != 'windows-latest'
+        env:
+          RUST_TEST_THREADS: 1
+        run: cargo test --verbose
