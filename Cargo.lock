@@ -1369,7 +1369,6 @@ dependencies = [
  "chrono",
  "dirs 4.0.0",
  "dryoc",
- "failure_derive",
  "hex",
  "indy-utils",
  "indy-vdr",
