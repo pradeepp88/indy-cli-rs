@@ -42,6 +42,7 @@ RUN apt-get update -y && apt-get install -y \
 	vim
 
 RUN pip3 install \
+	Cython==0.29.36 \
 	indy-plenum==${indy_plenum_ver} \
 	indy-node==${indy_node_ver}
 
